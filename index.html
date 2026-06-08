@@ -1,0 +1,1875 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+  <meta name="apple-mobile-web-app-title" content="Big &amp; Scary"/>
+  <title>Big &amp; Scary — Hustle &amp; Heart</title>
+  <link rel="manifest" href="/manifest.json"/>
+  <link rel="apple-touch-icon" href="/logo.svg"/>
+  <meta name="theme-color" content="#e8c840"/>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow+Condensed:wght@400;600;700&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet"/>
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    html,body,#root{height:100%;width:100%;background:#080a0f}
+    body{-webkit-font-smoothing:antialiased;overscroll-behavior:none}
+    input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+    input[type=number]{-moz-appearance:textfield}
+    ::-webkit-scrollbar{display:none}
+    *{-webkit-tap-highlight-color:transparent}
+  </style>
+</head>
+<body>
+  <div id="root"><div style="color:#e8c840;font-family:Georgia,serif;text-align:center;padding:40px;font-size:16px">Loading Big &amp; Scary...</div></div>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
+  <script></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
+  <script></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.22.5/babel.min.js"></script>
+  <script type="text/babel" data-presets="react" data-plugins="">
+const {useState,useEffect,useRef,useCallback,useMemo} = React;
+
+// ── THEME ──────────────────────────────────────────────────────────────────
+const C={bg:"#080a0f",surface:"#0f1218",card:"#141920",border:"#1e2530",
+  yellow:"#e8c840",yellowDim:"#a08a20",red:"#d43030",redDim:"#8a1a1a",
+  blue:"#2a6aad",blueBright:"#4a8fd4",steel:"#8a9bb0",muted:"#4a5568",
+  text:"#e8eaf0",dim:"#2a3344",green:"#2a8a4a",greenBright:"#3ab860",
+  purple:"#7c4daa",orange:"#d4782a"};
+const FD="'Bebas Neue',sans-serif";
+const FC="'Barlow Condensed',sans-serif";
+const FB="'Barlow',sans-serif";
+
+// ── STORAGE ────────────────────────────────────────────────────────────────
+// ── USERS ─────────────────────────────────────────────────────────────────
+const USERS = {
+  "1111": { name: "Andrew", emoji: "d" },
+  "2222": { name: "Beaudy", emoji: "e" },
+};
+const AUTH_KEY = "bigscary_auth";
+const getActiveUser = () => { try{return JSON.parse(localStorage.getItem(AUTH_KEY));}catch{return null;} };
+const setActiveUser = (pin) => { try{localStorage.setItem(AUTH_KEY,JSON.stringify({pin,ts:Date.now()}));}catch{} };
+const clearActiveUser = () => { try{localStorage.removeItem(AUTH_KEY);}catch{} };
+const getUserKey = (pin) => `bigscary_v4_${pin}`;
+const load = (pin) => { try{return JSON.parse(localStorage.getItem(getUserKey(pin)))||{};}catch{return{};} };
+const save = (d, pin) => { try{localStorage.setItem(getUserKey(pin),JSON.stringify(d));}catch{} };
+
+// ── CONSTANTS ──────────────────────────────────────────────────────────────
+const START_DATE = new Date("2026-06-09"); // Monday June 9
+const TRAINING_DAYS_OF_WEEK = [1,2,4,5]; // Mon,Tue,Thu,Fri
+
+// Auto-calculate current week from start date
+const calcCurrentWeek = () => {
+  const now = new Date();
+  const diff = Math.floor((now - START_DATE) / (1000*60*60*24*7));
+  return Math.max(1, Math.min(12, diff + 1));
+};
+
+// Phase from week (auto-gate)
+const phaseFromWeek = (w) => {
+  if (w <= 4) return 0;
+  if (w <= 8) return 1;
+  return 2;
+};
+
+// Deload every 4th week
+const isDeload = (w) => w % 4 === 0;
+
+// 1RM calculator (Epley formula)
+const calc1RM = (weight, reps) => {
+  if (!weight || !reps || reps <= 0) return 0;
+  return Math.round(parseFloat(weight) * (1 + parseInt(reps) / 30));
+};
+
+// Volume calculator
+const calcVolume = (sets) => {
+  return sets.filter(s=>!s.isWarmup).reduce((sum,s) => {
+    return sum + (parseFloat(s.w)||0) * (parseInt(s.r)||0);
+  }, 0);
+};
+
+// Progressive overload engine
+const isCompound = n => /squat|deadlift|bench|press|row|pull.up|thrust|lunge|dip/i.test(n);
+const isLowerBody = n => /squat|deadlift|thrust|lunge|leg|calf|tibialis/i.test(n);
+
+const calcTarget = (lastSets, ex, week, phase) => {
+  if (!lastSets || lastSets.length === 0 || week <= 1) return null;
+  const workSets = lastSets.filter(s => !s.isWarmup && !s.isBurnout);
+  if (!workSets.length) return null;
+  const lower = isLowerBody(ex.n);
+  const weightInc = ex.nw ? 0 : lower ? 10 : isCompound(ex.n) ? 5 : 2.5;
+  const allHit = workSets.every(s => {
+    const reps = parseInt(s.r)||0;
+    const rir  = parseInt(s.rir);
+    const tgt  = typeof ex.r==="number" ? ex.r : parseInt(ex.r)||10;
+    return reps >= tgt && (isNaN(rir) || rir <= 1);
+  });
+  const lastW = parseFloat(workSets[0]?.w)||0;
+  const tgtR  = typeof ex.r==="number" ? ex.r : parseInt(ex.r)||10;
+  const nextW = allHit ? lastW + weightInc : lastW;
+  if (phase===2) {
+    return Array.from({length:ex.s},(_,i)=>({
+      w: Math.max(0, nextW-(i*(lower?10:5))).toString(),
+      r: i===ex.s-1?"FAILURE":tgtR.toString(),
+      isBurnout: i===ex.s-1,
+    }));
+  }
+  return Array.from({length:ex.s},(_,i)=>({
+    w: nextW.toString(),
+    r: i===ex.s-1&&phase>=1?"BURNOUT":tgtR.toString(),
+    isBurnout: i===ex.s-1&&phase>=1,
+  }));
+};
+
+// Warm-up sets generator
+const calcWarmups = (workWeight, ex) => {
+  if (!workWeight || ex.nw || parseFloat(workWeight) < 45) return [];
+  const w = parseFloat(workWeight);
+  if (!isCompound(ex.n)) return [];
+  return [
+    {w: Math.round(w*0.4).toString(), r:"10", isWarmup:true, label:"Warm-up 1"},
+    {w: Math.round(w*0.6).toString(), r:"6",  isWarmup:true, label:"Warm-up 2"},
+    {w: Math.round(w*0.8).toString(), r:"3",  isWarmup:true, label:"Warm-up 3"},
+  ];
+};
+
+// ── PHASES ─────────────────────────────────────────────────────────────────
+const PHASES=[
+  {id:0,label:"Phase 1",sub:"Recomp Foundation",weeks:"Wks 1-4",color:C.blue,
+   goal:"Fix movement. Build habit. Protect muscle."},
+  {id:1,label:"Phase 2",sub:"Strength & Cut",weeks:"Wks 5-8",color:C.yellow,
+   goal:"Progressive overload. Tighten the deficit. Get hard."},
+  {id:2,label:"Phase 3",sub:"Shred",weeks:"Wks 9-12",color:C.red,
+   goal:"Strip the last fat. Look big and scary."},
+];
+
+// ── WORKOUTS ───────────────────────────────────────────────────────────────
+const WO=[
+  [
+    {day:"Day A",label:"Upper - Push/Pull",focus:"Shoulder-safe pressing. Landmine dominant. Trunk mass priority.",ex:[
+      {n:"Landmine Press",s:4,r:"10 ea",note:"AC-joint safe. Full ROM. Best shoulder builder for your situation.",inj:"shoulder"},
+      {n:"Chest-Supported DB Row",s:4,r:12,note:"Trunk muscle LOW. Rows are #1 priority. Go heavy every session.",inj:"none"},
+      {n:"DB Floor Press",s:3,r:12,note:"Limits dangerous ROM. Loads chest hard without AC stress.",inj:"shoulder"},
+      {n:"Face Pull (cable)",s:4,r:15,note:"Rotator cuff + rear delt health. Every upper session. Never skip.",inj:"shoulder"},
+      {n:"Incline DB Curl",s:3,r:12,note:"Long head bicep stretch at bottom. Arms that fill a sleeve.",inj:"none"},
+      {n:"Cable Tricep Pushdown",s:3,r:15,note:"Lateral head = arm width. Control the eccentric.",inj:"none"},
+      {n:"Dead Bug",s:3,r:"8 ea",note:"Core foundation. Low back stays glued. Breathe out on extension.",nw:true,inj:"none"},
+    ],mg:["chest","shoulders","back","biceps","triceps","core"]},
+    {day:"Day B",label:"Lower - Glutes & Hams",focus:"Patellar tendinitis protocol. Hip mobility first. Posterior chain.",ex:[
+      {n:"Hip 90/90 Mobility",s:2,r:"90s ea",note:"ALWAYS first. Non-negotiable for your hips and knees.",nw:true,inj:"hip"},
+      {n:"Hip Thrust (barbell)",s:4,r:12,note:"Glutes without knee stress. Load heavy. Trunk mass builder.",inj:"knee"},
+      {n:"Romanian Deadlift",s:4,r:10,note:"Hinge pattern. Minimal knee load. Go heavy.",inj:"knee"},
+      {n:"Leg Press (high foot)",s:3,r:15,note:"High placement = less patellar stress. Slow descent.",inj:"knee"},
+      {n:"Seated Leg Curl",s:3,r:12,note:"Isolate hamstrings. Controls patellar tendon load.",inj:"knee"},
+      {n:"Calf Raise (standing)",s:3,r:20,note:"Tight calves worsen patella pain. Stretch at bottom.",inj:"foot"},
+      {n:"Pallof Press (cable)",s:3,r:"10 ea",note:"Anti-rotation core. Trunk mass attack.",inj:"none"},
+    ],mg:["glutes","hamstrings","quads","calves","core"]},
+    {day:"Day C",label:"Upper - Back Width",focus:"Build the V-taper. Upper back thickness. Wide and intimidating.",ex:[
+      {n:"Neutral-Grip Pull-Up",s:4,r:"6-10",note:"Neutral grip protects AC joint. Width that looks scary.",inj:"shoulder"},
+      {n:"Seated Cable Row (wide)",s:4,r:12,note:"Trunk muscle LOW. Attack every session.",inj:"none"},
+      {n:"Landmine Row",s:3,r:"10 ea",note:"Shoulder-safe heavy rowing. One arm, explosive pull.",inj:"shoulder"},
+      {n:"DB Lateral Raise",s:4,r:15,note:"Capped delts = big and scary silhouette. Light, strict form.",inj:"shoulder"},
+      {n:"Hammer Curl",s:3,r:12,note:"Brachialis = arm thickness from all angles.",inj:"none"},
+      {n:"OH Cable Tricep Ext",s:3,r:12,note:"Long head mass. Elbows tight.",inj:"shoulder"},
+      {n:"Ab Wheel Rollout",s:3,r:"8-10",note:"Best core exercise. Hips do not drop.",nw:true,inj:"none"},
+    ],mg:["back","shoulders","biceps","triceps","core"]},
+    {day:"Day D",label:"Lower - Quad Focus",focus:"Patella-friendly quads. Hip flexor mobility. Deadlift strength.",ex:[
+      {n:"Couch Stretch",s:2,r:"90s ea",note:"ALWAYS first. Tight hip flexors = root of patellar pain.",nw:true,inj:"hip"},
+      {n:"Goblet Squat (slow)",s:4,r:10,note:"Controlled descent, heels elevated if needed.",inj:"knee"},
+      {n:"Deadlift",s:4,r:6,note:"You pull 375. Build from there. Own this lift.",inj:"none"},
+      {n:"Bulgarian Split Squat",s:3,r:"8 ea",note:"Rear foot elevated reduces knee torque. Slow on descent.",inj:"knee"},
+      {n:"Leg Extension (light)",s:3,r:15,note:"Rehab load only. Strengthen quad tendon insertion.",inj:"knee"},
+      {n:"Tibialis Raise",s:3,r:20,note:"Fixes tight calves + foot chain from the ground.",nw:true,inj:"foot"},
+      {n:"Plank + Glute Squeeze",s:3,r:"40s",note:"Anterior pelvic tilt fix. Squeeze glutes the whole hold.",nw:true,inj:"none"},
+    ],mg:["quads","hamstrings","glutes","core"]},
+  ],
+  [
+    {day:"Day A",label:"Upper - Heavy Push",focus:"Progressive overload. Bench strength. Shoulder integrity.",ex:[
+      {n:"Landmine Press",s:5,r:"8 ea",note:"Add weight every session. Shoulder stays safe.",inj:"shoulder"},
+      {n:"Incline DB Press",s:4,r:10,note:"Upper chest. DBs allow natural rotation - safer than bar.",inj:"shoulder"},
+      {n:"Chest-Supported DB Row",s:5,r:10,note:"Trunk mass LOW. Row heavy every session.",inj:"none"},
+      {n:"Face Pull (cable)",s:4,r:15,note:"Shoulder health. Never skip.",inj:"shoulder"},
+      {n:"Lateral Raise (cable)",s:4,r:15,note:"Cable keeps tension. Delt caps.",inj:"shoulder"},
+      {n:"EZ Bar Curl",s:3,r:10,note:"Sleeve-fillers. Controlled, no swinging.",inj:"none"},
+      {n:"Skull Crusher",s:3,r:10,note:"Tricep mass. Elbows locked in.",inj:"none"},
+    ],mg:["chest","shoulders","back","biceps","triceps"]},
+    {day:"Day B",label:"Lower - Deadlift Focus",focus:"Pull heavy. Glute activation. Posterior chain.",ex:[
+      {n:"Hip 90/90 + Couch Stretch",s:2,r:"90s ea",note:"Non-negotiable warm-up.",nw:true,inj:"hip"},
+      {n:"Deadlift (heavy)",s:5,r:5,note:"Work toward 405. Progressive overload.",inj:"none"},
+      {n:"Hip Thrust (barbell)",s:4,r:10,note:"Heavy. Add 5-10 lbs per week.",inj:"knee"},
+      {n:"Romanian Deadlift",s:4,r:8,note:"Slow eccentric. Load the hamstrings.",inj:"knee"},
+      {n:"Leg Press",s:3,r:15,note:"High foot, controlled descent.",inj:"knee"},
+      {n:"Nordic Curl (assisted)",s:3,r:"4-6",note:"Most effective hamstring exercise.",inj:"knee"},
+      {n:"Calf + Tibialis Raise",s:3,r:15,note:"Foot and ankle health protocol.",inj:"foot"},
+    ],mg:["hamstrings","glutes","quads","calves"]},
+    {day:"Day C",label:"Upper - Back Thickness",focus:"Build the trunk. Wide back. Intimidating physique.",ex:[
+      {n:"Weighted Pull-Up",s:5,r:"5-8",note:"Add weight. Neutral grip.",inj:"shoulder"},
+      {n:"Pendlay Row",s:4,r:8,note:"Explosive pull. Trunk mass. Your weak point - attack it.",inj:"none"},
+      {n:"Seated Cable Row (close)",s:4,r:10,note:"Full stretch at front. Squeeze hard at back.",inj:"none"},
+      {n:"DB Shoulder Press (neutral)",s:4,r:10,note:"Neutral grip protects AC. Shoulder mass.",inj:"shoulder"},
+      {n:"Rear Delt Fly (cable)",s:4,r:15,note:"Posture and width.",inj:"shoulder"},
+      {n:"Incline DB Curl",s:3,r:10,note:"Long head peak.",inj:"none"},
+      {n:"Tricep Dip",s:3,r:10,note:"Compound tricep mass.",inj:"shoulder"},
+    ],mg:["back","shoulders","biceps","triceps"]},
+    {day:"Day D",label:"Lower - Squat Strength",focus:"Build the squat. Hip and knee rehab maintained.",ex:[
+      {n:"Hip Flexor + Calf Mobility",s:2,r:"90s ea",note:"Always. Patellar tendinitis lives in tight hips.",nw:true,inj:"hip"},
+      {n:"Back Squat",s:5,r:5,note:"Build toward 315+. Controlled descent.",inj:"knee"},
+      {n:"Bulgarian Split Squat (DB)",s:4,r:"8 ea",note:"Slow negative. Single-leg strength.",inj:"knee"},
+      {n:"Hip Thrust",s:4,r:10,note:"Heaviest you have done. Glutes are the engine.",inj:"knee"},
+      {n:"Leg Extension (moderate)",s:3,r:15,note:"Progress weight slowly.",inj:"knee"},
+      {n:"Farmer's Carry",s:4,r:"30s",note:"Grip, core, traps. Total body hardness.",inj:"none"},
+      {n:"Ab Wheel Rollout",s:3,r:10,note:"Core density. Low back neutral.",nw:true,inj:"none"},
+    ],mg:["quads","glutes","hamstrings","core"]},
+  ],
+  [
+    {day:"Day A",label:"Upper - Maximum Intensity",focus:"All-out. Supersets. Look terrifying.",ex:[
+      {n:"Landmine Press SS",s:4,r:"10 ea",note:"Superset with face pulls. 90s rest after pair.",inj:"shoulder"},
+      {n:"Face Pull SS",s:4,r:15,note:"Back-to-back with Landmine Press.",inj:"shoulder"},
+      {n:"Weighted Pull-Up",s:5,r:"6-8",note:"Max weight. Building the final physique.",inj:"shoulder"},
+      {n:"Chest-Supported Row (heavy)",s:5,r:8,note:"Trunk mass - this is the phase it shows.",inj:"none"},
+      {n:"Incline Press + Lat Raise SS",s:4,r:"10/15",note:"Superset. Rest 60s. Chest + delts.",inj:"shoulder"},
+      {n:"Curl/Pushdown Superset",s:4,r:"10/12",note:"Back-to-back. Arms fill the sleeves.",inj:"none"},
+      {n:"Pallof Press + Ab Wheel SS",s:3,r:"10/8",note:"Core density visible now.",nw:true,inj:"none"},
+    ],mg:["chest","shoulders","back","biceps","triceps","core"]},
+    {day:"Day B",label:"Lower - Strength + Conditioning",focus:"Heavy pull. Glute focus. Metabolic finisher.",ex:[
+      {n:"Full Mobility Protocol",s:1,r:"5 min",note:"90/90, couch stretch, calf stretch, ankle circles.",nw:true,inj:"hip"},
+      {n:"Deadlift (near max)",s:5,r:"3-5",note:"Work toward 4 plates. The big scary pull.",inj:"none"},
+      {n:"Hip Thrust (max load)",s:5,r:8,note:"Heaviest you have done. Glutes are the engine.",inj:"knee"},
+      {n:"Romanian Deadlift",s:4,r:8,note:"Hamstring density. Slow and loaded.",inj:"knee"},
+      {n:"Walking Lunge (DBs)",s:3,r:"10 ea",note:"Forward lunge - less patellar stress.",inj:"knee"},
+      {n:"Sled Push or KB Swing",s:5,r:"30s",note:"Metabolic finisher. Fat burns here.",inj:"none"},
+      {n:"Tibialis + Calf Protocol",s:3,r:20,note:"End every lower session with this.",inj:"foot"},
+    ],mg:["hamstrings","glutes","quads","calves"]},
+    {day:"Day C",label:"Upper - Width & Detail",focus:"Wide back. Capped delts. Visible separation.",ex:[
+      {n:"Pull-Up Cluster Sets",s:5,r:"3-3-3",note:"15s between clusters. More volume, more strength.",inj:"shoulder"},
+      {n:"Pendlay Row (heavy)",s:5,r:6,note:"Explosive. Trunk thickness. Attack it.",inj:"none"},
+      {n:"Cable Row (long pull)",s:4,r:10,note:"Full stretch, drive elbows hard.",inj:"none"},
+      {n:"Lateral Raise 21s",s:4,r:"7+7+7",note:"7 bottom, 7 top, 7 full. Deltoid burn.",inj:"shoulder"},
+      {n:"Rear Delt + Face Pull SS",s:4,r:"12+15",note:"Superset. Back of a scary physique.",inj:"shoulder"},
+      {n:"Arm Finisher SS",s:3,r:"10 ea",note:"Curl + pushdown superset. Maximum pump.",inj:"none"},
+      {n:"Dead Bug + Pallof SS",s:3,r:"8+10",note:"Final phase core density.",nw:true,inj:"none"},
+    ],mg:["back","shoulders","biceps","triceps","core"]},
+    {day:"Day D",label:"Lower - Final Shred",focus:"Heavy squat. Metabolic work. Look like you lift.",ex:[
+      {n:"Mobility + Activation",s:1,r:"5 min",note:"Hip flexors, quads, calves. Do not skip.",nw:true,inj:"hip"},
+      {n:"Back Squat (heavy)",s:5,r:5,note:"Final phase. Push the numbers. You have earned it.",inj:"knee"},
+      {n:"Hip Thrust + RDL SS",s:4,r:"10+8",note:"Posterior chain superset. 90s between pairs.",inj:"knee"},
+      {n:"Bulgarian Split Squat",s:4,r:"8 ea",note:"Final phase - add weight.",inj:"knee"},
+      {n:"Leg Press (drop set)",s:4,r:12,note:"Last set = drop set. Strip weight, go again.",inj:"knee"},
+      {n:"KB Swing",s:5,r:20,note:"Metabolic finisher. Hip hinge power.",inj:"none"},
+      {n:"Farmer's Carry",s:4,r:"40s",note:"Heavy DBs. Walk. This is what hardness looks like.",inj:"none"},
+    ],mg:["quads","glutes","hamstrings","core"]},
+  ],
+];
+
+// ── MEAL PLANS ─────────────────────────────────────────────────────────────
+const MEALS=[
+  {ph:0,dt:"training",cal:2330,p:225,c:200,f:65,
+    bkfst:{time:"5:00-7:30 AM",items:[
+      {l:"XS Pre-Workout (5:00AM)",d:"XS Pre-Workout only - no coffee Phase 1",cal:10,p:0,c:1,f:0,xs:true},
+      {l:"Option A - Night Prep (5:05AM)",d:"Overnight oats jar: 1 cup oats + 1 scoop XS Whey + almond milk + banana + cinnamon. Grab jar + 3 hard boiled eggs.",cal:420,p:42,c:38,f:8,xs:false},
+      {l:"Option B - Zero Prep (5:05AM)",d:"XS Premade Shake + 1 banana + small handful almonds. 30 seconds.",cal:380,p:28,c:35,f:10,xs:true},
+      {l:"XS Post-Workout Shake (7:15AM)",d:"XS Grass Fed Whey x2 + XS Muscle Multiplier + XS Post-Workout + 1 banana",cal:420,p:52,c:44,f:5,xs:true},
+    ],supps:["Perfect Pack AM","Liver Health","Rhodiola","Lion's Mane"],
+    note:"Option A = Sunday batch cook. 4 jars + 10 eggs. Zero morning prep. Option B = 30 second backup."},
+    lunch:{time:"11:30 AM",items:[
+      {l:"Main Meal",d:"8oz chicken breast + 1.5 cups white rice + spinach + olive oil",cal:490,p:52,c:42,f:12,xs:false},
+      {l:"XS Ignite (optional)",d:"XS Ignite Powder if energy is low",cal:10,p:0,c:2,f:0,xs:true},
+    ],supps:["CLA x2","Turmeric","Liver Health 2nd dose"],note:"Biggest solid meal. Fuel the muscle repair. Trunk muscle gets rebuilt here."},
+    dinner:{time:"1:30-9:30 PM",items:[
+      {l:"Meal 3 (1:30PM)",d:"6oz 93% lean ground beef + sweet potato + broccoli",cal:420,p:48,c:28,f:12,xs:false},
+      {l:"Snack (4:30PM)",d:"1 cup cottage cheese + 10 almonds + cinnamon",cal:210,p:26,c:8,f:8,xs:false},
+      {l:"Dinner (5:15PM)",d:"7oz salmon + 1 cup quinoa + asparagus",cal:390,p:44,c:28,f:12,xs:false},
+      {l:"Night Protein (9:30PM)",d:"XS Grass Fed Whey 1 scoop in water",cal:130,p:26,c:4,f:1,xs:true},
+    ],supps:["CLA x2","Turmeric","Vision Health","Perfect Pack PM"],
+    note:"Salmon delivers omega-3s for joint recovery. Night protein protects muscle during short sleep."},
+  },
+  {ph:0,dt:"rest",cal:2050,p:218,c:120,f:70,
+    bkfst:{time:"7:00 AM",items:[
+      {l:"Breakfast",d:"4 whole eggs scrambled + 2 slices Ezekiel bread + black coffee",cal:390,p:40,c:22,f:16,xs:false},
+    ],supps:["Perfect Pack AM","Liver Health","Rhodiola","Lion's Mane"],
+    note:"Rest day - lower carbs, same protein. Supplements absorb best with fat from eggs."},
+    lunch:{time:"11:30 AM - 1:00 PM",items:[
+      {l:"Snack (10:30AM)",d:"1 cup Greek yogurt plain + handful blueberries",cal:180,p:22,c:18,f:4,xs:false},
+      {l:"Lunch (1:00PM)",d:"8oz chicken + mixed greens + cucumber + olive oil + lemon",cal:430,p:50,c:14,f:12,xs:false},
+      {l:"XS Ignite (optional)",d:"XS Ignite Powder mid-morning",cal:10,p:0,c:2,f:0,xs:true},
+    ],supps:["CLA x2","Turmeric","Liver Health 2nd dose"],note:"Rest day = low carb window. Protein stays high."},
+    dinner:{time:"4:00-9:30 PM",items:[
+      {l:"Snack (4:00PM)",d:"2 tbsp natural peanut butter + 1 apple",cal:200,p:5,c:24,f:16,xs:false},
+      {l:"Dinner (5:15PM)",d:"8oz sirloin steak + roasted broccoli + cauliflower + small sweet potato",cal:450,p:52,c:18,f:14,xs:false},
+      {l:"Night Protein (9:30PM)",d:"XS Grass Fed Whey 1 scoop in water",cal:130,p:26,c:4,f:1,xs:true},
+    ],supps:["CLA x2","Turmeric","Vision Health","Perfect Pack PM"],
+    note:"Red meat twice a week for iron, zinc, and natural creatine."},
+  },
+  {ph:1,dt:"training",cal:2280,p:228,c:190,f:62,
+    bkfst:{time:"5:00-7:30 AM",items:[
+      {l:"XS Pre-Workout (5:00AM)",d:"XS Pre-Workout only - coffee still cut",cal:10,p:0,c:1,f:0,xs:true},
+      {l:"Option A - Night Prep (5:05AM)",d:"Overnight oats jar: 1.5 cups oats + 1 scoop XS Whey + almond milk + banana + cinnamon + 1 tbsp peanut butter. Grab jar + 3 hard boiled eggs.",cal:460,p:44,c:42,f:10,xs:false},
+      {l:"Option B - Zero Prep (5:05AM)",d:"XS Premade Shake + 1 banana + small handful almonds + rice cake.",cal:420,p:30,c:40,f:10,xs:true},
+      {l:"XS Post-Workout Shake (7:15AM)",d:"XS Grass Fed Whey x2 + XS Muscle Multiplier + XS Post-Workout + rice cakes",cal:430,p:54,c:42,f:4,xs:true},
+    ],supps:["Perfect Pack AM","Liver Health","Rhodiola","Lion's Mane"],
+    note:"Phase 2 portions slightly larger. Option A adds peanut butter. Sunday prep system same - 0 morning cooking."},
+    lunch:{time:"11:30 AM",items:[
+      {l:"Main Meal",d:"9oz chicken breast + 2 cups white rice + spinach + hot sauce",cal:510,p:56,c:46,f:10,xs:false},
+    ],supps:["CLA x2","Turmeric","Liver Health 2nd dose"],note:"Biggest meal. Phase 2 means more volume. Rice is your friend on training days."},
+    dinner:{time:"1:30-10:00 PM",items:[
+      {l:"Meal 3 (1:30PM)",d:"7oz 93% ground beef + 1.5 cups rice + roasted veg",cal:450,p:50,c:34,f:12,xs:false},
+      {l:"Snack (5:00PM)",d:"Cottage cheese + cucumber OR XS Premade Shake",cal:190,p:28,c:6,f:5,xs:false},
+      {l:"Dinner (5:15PM)",d:"8oz salmon + roasted asparagus + half cup quinoa",cal:400,p:46,c:20,f:14,xs:false},
+      {l:"Night Protein (10:00PM)",d:"XS Grass Fed Whey 1 scoop in water",cal:130,p:26,c:4,f:1,xs:true},
+    ],supps:["CLA x2","Turmeric","Vision Health","Perfect Pack PM"],
+    note:"Phase 2 evenings tighten up. Salmon omega-3s working on shoulder and knee recovery."},
+  },
+  {ph:1,dt:"rest",cal:1980,p:222,c:95,f:72,
+    bkfst:{time:"7:00 AM",items:[
+      {l:"Breakfast",d:"5 whole eggs + spinach in olive oil + black coffee",cal:380,p:38,c:6,f:22,xs:false},
+    ],supps:["Perfect Pack AM","Liver Health","Rhodiola","Lion's Mane"],
+    note:"Phase 2 rest day - very low carb morning. Fat and protein only until lunch."},
+    lunch:{time:"11:30 AM - 1:00 PM",items:[
+      {l:"Snack (10:30AM)",d:"Low fat cottage cheese + cinnamon OR XS Premade Shake",cal:160,p:24,c:6,f:4,xs:false},
+      {l:"Lunch (1:00PM)",d:"9oz chicken + large salad with olive oil dressing",cal:420,p:54,c:10,f:14,xs:false},
+    ],supps:["CLA x2","Turmeric","Liver Health 2nd dose"],note:"Protein dominant day. Rest day carbs stay low."},
+    dinner:{time:"4:00-10:00 PM",items:[
+      {l:"Snack (4:00PM)",d:"String cheese x2 + handful almonds",cal:200,p:16,c:3,f:16,xs:false},
+      {l:"Dinner (5:15PM)",d:"10oz sirloin + roasted broccoli + zucchini",cal:470,p:58,c:8,f:16,xs:false},
+      {l:"Night Protein (10:00PM)",d:"XS Grass Fed Whey 1 scoop in water",cal:130,p:26,c:4,f:1,xs:true},
+    ],supps:["CLA x2","Turmeric","Vision Health","Perfect Pack PM"],
+    note:"Phase 2 rest day dinner is aggressive - protein and fat only."},
+  },
+  {ph:2,dt:"training",cal:2200,p:232,c:170,f:58,
+    bkfst:{time:"5:00-7:30 AM",items:[
+      {l:"XS Pre-Workout (5:00AM)",d:"XS Pre-Workout only - coffee still cut",cal:10,p:0,c:1,f:0,xs:true},
+      {l:"Option A - Night Prep (5:05AM)",d:"Overnight oats jar: 1 cup oats + 1 scoop XS Whey + almond milk + half banana + cinnamon. Grab jar + 2 hard boiled eggs. Smaller for Phase 3 shred.",cal:380,p:40,c:32,f:7,xs:false},
+      {l:"Option B - Zero Prep (5:05AM)",d:"XS Premade Shake + half banana. Lean and fast. Phase 3 precision.",cal:330,p:27,c:28,f:8,xs:true},
+      {l:"XS Post-Workout Shake (7:15AM)",d:"XS Grass Fed Whey x2 + XS Muscle Multiplier + XS Post-Workout + rice cake",cal:400,p:55,c:36,f:3,xs:true},
+    ],supps:["Perfect Pack AM","Liver Health","Rhodiola","Lion's Mane"],
+    note:"Phase 3 pre-workout meal shrinks slightly. Post-workout trio stays identical - muscle protection is non-negotiable."},
+    lunch:{time:"11:30 AM",items:[
+      {l:"Main Meal",d:"9oz chicken breast + 1.5 cups rice + cucumber + hot sauce",cal:460,p:56,c:38,f:9,xs:false},
+    ],supps:["CLA x2","Turmeric","Liver Health 2nd dose"],note:"Phase 3 precision - exact portions matter now."},
+    dinner:{time:"1:30-10:00 PM",items:[
+      {l:"Meal 3 (1:30PM)",d:"8oz white fish (cod/tilapia) + half sweet potato + broccoli",cal:390,p:52,c:18,f:6,xs:false},
+      {l:"Snack (4:30PM)",d:"Low fat Greek yogurt plain OR XS Premade Shake",cal:150,p:24,c:8,f:2,xs:false},
+      {l:"Dinner (5:15PM)",d:"9oz sirloin or salmon + roasted veg only",cal:400,p:50,c:8,f:16,xs:false},
+      {l:"Night Protein (10:00PM)",d:"XS Grass Fed Whey 1 scoop in water",cal:130,p:26,c:4,f:1,xs:true},
+    ],supps:["CLA x2","Turmeric","Vision Health","Perfect Pack PM"],
+    note:"Phase 3 evenings = protein + fat only. This is the shred."},
+  },
+  {ph:2,dt:"rest",cal:1900,p:225,c:70,f:68,
+    bkfst:{time:"7:00 AM",items:[
+      {l:"Breakfast",d:"5 whole eggs + black coffee",cal:320,p:36,c:2,f:22,xs:false},
+    ],supps:["Perfect Pack AM","Liver Health","Rhodiola","Lion's Mane"],
+    note:"Phase 3 rest day: almost zero carbs. Aggressive and effective."},
+    lunch:{time:"11:30 AM - 1:00 PM",items:[
+      {l:"Snack (10:30AM)",d:"Cottage cheese + cinnamon OR XS Premade Shake",cal:140,p:22,c:4,f:3,xs:false},
+      {l:"Lunch (1:00PM)",d:"10oz white fish + huge salad + olive oil dressing",cal:360,p:54,c:6,f:12,xs:false},
+    ],supps:["CLA x2","Turmeric","Liver Health 2nd dose"],note:"Lean protein and fat only at lunch."},
+    dinner:{time:"4:30-10:00 PM",items:[
+      {l:"Snack (4:30PM)",d:"Almonds + string cheese",cal:180,p:14,c:4,f:14,xs:false},
+      {l:"Dinner (5:15PM)",d:"10oz lean steak + steamed broccoli + green beans",cal:430,p:56,c:8,f:16,xs:false},
+      {l:"Night Protein (10:00PM)",d:"XS Grass Fed Whey 1 scoop in water",cal:130,p:26,c:4,f:1,xs:true},
+    ],supps:["CLA x2","Turmeric","Vision Health","Perfect Pack PM"],
+    note:"Phase 3 rest day is basically carnivore evening."},
+  },
+];
+
+// ── SUPPLEMENT DATA ────────────────────────────────────────────────────────
+const DAILY_SUPPS = [
+  {id:"preworkout",   name:"XS Pre-Workout",        time:"5:00 AM",   cat:"xs",     trainOnly:true,  note:"Training days only. 115mg caffeine. No coffee."},
+  {id:"breakfast_xs", name:"XS Post-Workout Trinity",time:"7:15 AM",  cat:"xs",     trainOnly:true,  note:"Muscle Multiplier FIRST then Whey x2 + Post-Workout."},
+  {id:"ignite",       name:"XS Ignite Powder",       time:"Daily",    cat:"xs",     trainOnly:false, note:"Daily for fat loss. Pre-cardio or mid-morning."},
+  {id:"perfectpack",  name:"Perfect Pack AM",         time:"Breakfast",cat:"nut",    trainOnly:false, note:"With food. Every morning."},
+  {id:"liver",        name:"Liver Health",            time:"Breakfast",cat:"nut",    trainOnly:false, note:"With breakfast. Supports fat metabolism."},
+  {id:"rhodiola",     name:"Rhodiola",                time:"Breakfast",cat:"nut",    trainOnly:false, note:"Every morning. Cortisol control. Critical for your sleep."},
+  {id:"lionsmane",    name:"Lion's Mane",             time:"Breakfast",cat:"nut",    trainOnly:false, note:"Every morning. Cognitive + nervous system support."},
+  {id:"cla_lunch",    name:"CLA x2 softgels",         time:"Lunch",    cat:"nut",    trainOnly:false, note:"With lunch. Needs dietary fat to absorb."},
+  {id:"turmeric",     name:"Turmeric",                time:"Lunch",    cat:"nut",    trainOnly:false, note:"With lunch or dinner. AC joint + patellar tendinitis."},
+  {id:"liver2",       name:"Liver Health (2nd dose)", time:"Lunch",    cat:"nut",    trainOnly:false, note:"2nd dose with lunch."},
+  {id:"cla_dinner",   name:"CLA x2 softgels",         time:"Dinner",   cat:"nut",    trainOnly:false, note:"With dinner. Needs dietary fat."},
+  {id:"vision",       name:"Vision Health",           time:"Dinner",   cat:"nut",    trainOnly:false, note:"With dinner. Fat-soluble - needs this meal."},
+  {id:"perfectpm",    name:"Perfect Pack PM",          time:"Dinner",   cat:"nut",    trainOnly:false, note:"PM packet with dinner."},
+  {id:"nightpro",     name:"XS Grass Fed Whey (night)",time:"9:30 PM", cat:"xs",     trainOnly:false, note:"Every single night. Protects muscle during short sleep."},
+];
+
+// ── MOBILITY ───────────────────────────────────────────────────────────────
+const MOB=[
+  {icon:"d",title:"Hip 90/90 Stretch",time:"2 min/side",pri:"CRITICAL",
+   body:"Both knees at 90 deg. Sit tall. Swap sides. Fixes patellar tendinitis, tight hips, unlocks squat. Daily."},
+  {icon:"e",title:"Couch Stretch",time:"90s/side",pri:"CRITICAL",
+   body:"Rear knee on ground, front foot forward. Drive hips forward, squeeze rear glute. Root fix for patellar pain."},
+  {icon:"f",title:"Thoracic Foam Roll",time:"2 minutes",pri:"HIGH",
+   body:"Roll just below shoulder blades. Extend over roller. Unlocks shoulder mobility, helps AC joint."},
+  {icon:"g",title:"Band Pull-Apart",time:"3x20 reps",pri:"HIGH",
+   body:"Hold band at chest, pull apart until arms straight. Rear delts + rotator cuff. Before every upper session."},
+  {icon:"h",title:"Dead Hang",time:"3x20-30s",pri:"HIGH",
+   body:"Full dead hang from pull-up bar. Decompresses spine, stretches lats. Best single thing for your AC joint."},
+  {icon:"i",title:"Calf + Soleus Stretch",time:"90s each",pri:"MEDIUM",
+   body:"Standing calf (straight leg) + seated towel stretch (bent knee). Tight calves create patellar chain reaction."},
+  {icon:"j",title:"Lacrosse Ball Foot Roll",time:"2 min/foot",pri:"MEDIUM",
+   body:"Roll under arch, heel, ball of foot. Breaks adhesions. Fixes foot to ankle to knee chain."},
+  {icon:"k",title:"Wall Ankle Mobility",time:"2 min each",pri:"MEDIUM",
+   body:"Foot 3 inches from wall, drive knee to touch. Ankle dorsiflexion = better squat = less patellar stress."},
+];
+
+// ── ICONS ──────────────────────────────────────────────────────────────────
+const ICON_MAP={
+  dumbbell:(sz,col)=>(<svg width={sz} height={sz} viewBox="0 0 24 24" fill="none" stroke={col} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 5v14M18 5v14M6 8h3M15 8h3M6 16h3M15 16h3M9 8v8M15 8v8"/></svg>),
+  meals:(sz,col)=>(<svg width={sz} height={sz} viewBox="0 0 24 24" fill="none" stroke={col} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 11l19-9-9 19-2-8-8-2z"/></svg>),
+  supps:(sz,col)=>(<svg width={sz} height={sz} viewBox="0 0 24 24" fill="none" stroke={col} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>),
+  mobility:(sz,col)=>(<svg width={sz} height={sz} viewBox="0 0 24 24" fill="none" stroke={col} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="6" r="2"/><path d="M12 8v6M8 14l4 4 4-4M8 10l-4 4M16 10l4 4"/></svg>),
+  track:(sz,col)=>(<svg width={sz} height={sz} viewBox="0 0 24 24" fill="none" stroke={col} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 3v18h18"/><path d="M18 9l-6-6-4 4-3-3"/></svg>),
+  daily:(sz,col)=>(<svg width={sz} height={sz} viewBox="0 0 24 24" fill="none" stroke={col} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>),
+  check:(sz,col)=>(<svg width={sz} height={sz} viewBox="0 0 24 24" fill="none" stroke={col} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5"/></svg>),
+  x:(sz,col)=>(<svg width={sz} height={sz} viewBox="0 0 24 24" fill="none" stroke={col} strokeWidth="2.5" strokeLinecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>),
+  star:(sz,col)=>(<svg width={sz} height={sz} viewBox="0 0 24 24" fill={col} stroke={col} strokeWidth="1"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>),
+  camera:(sz,col)=>(<svg width={sz} height={sz} viewBox="0 0 24 24" fill="none" stroke={col} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>),
+  trophy:(sz,col)=>(<svg width={sz} height={sz} viewBox="0 0 24 24" fill="none" stroke={col} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9H4.5a2.5 2.5 0 010-5H6"/><path d="M18 9h1.5a2.5 2.5 0 000-5H18"/><path d="M4 22h16M12 17v5M8 17h8"/><path d="M18 2H6v7a6 6 0 006 6 6 6 0 006-6V2z"/></svg>),
+};
+const Ic=({n,sz=20,col=C.steel})=>{const fn=ICON_MAP[n];return fn?fn(sz,col):<span style={{width:sz,height:sz,display:"inline-block"}}/>;};
+
+// ── REST TIMER ─────────────────────────────────────────────────────────────
+const RestTimer=({onClose})=>{
+  const [secs,setSecs]=useState(90);
+  const [run,setRun]=useState(false);
+  const [init,setInit]=useState(90);
+  const ref=useRef(null);
+  useEffect(()=>{
+    if(run){ref.current=setInterval(()=>setSecs(s=>{if(s<=1){clearInterval(ref.current);setRun(false);return 0;}return s-1;}),1000);}
+    else clearInterval(ref.current);
+    return()=>clearInterval(ref.current);
+  },[run]);
+  const r=54,ci=2*Math.PI*r,pct=secs/init;
+  return(
+    <div style={{position:"fixed",inset:0,zIndex:300,display:"flex",alignItems:"flex-end",background:"rgba(0,0,0,0.9)"}} onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
+      <div style={{width:"100%",maxWidth:430,margin:"0 auto",background:C.card,borderRadius:"16px 16px 0 0",padding:"28px 20px 48px",borderBottom:"none",textAlign:"center"}}>
+        <p style={{margin:"0 0 20px",fontSize:11,color:C.muted,letterSpacing:"0.25em",textTransform:"uppercase",fontFamily:FC}}>REST TIMER</p>
+        <svg width="130" height="130" viewBox="0 0 130 130" style={{display:"block",margin:"0 auto 20px"}}>
+          <circle cx="65" cy="65" r={r} fill="none" stroke={C.border} strokeWidth="6"/>
+          <circle cx="65" cy="65" r={r} fill="none" stroke={C.yellow} strokeWidth="6"
+            strokeDasharray={ci} strokeDashoffset={ci*(1-pct)} strokeLinecap="round"
+            transform="rotate(-90 65 65)" style={{transition:"stroke-dashoffset 1s linear"}}/>
+          <text x="65" y="70" textAnchor="middle" fill={C.text} fontSize="28" fontFamily={FC} fontWeight="bold">
+            {Math.floor(secs/60)}:{String(secs%60).padStart(2,"0")}
+          </text>
+        </svg>
+        <div style={{display:"flex",gap:8,justifyContent:"center",marginBottom:20}}>
+          {[60,90,120,180].map(p=>(<button key={p} onClick={()=>{setSecs(p);setInit(p);setRun(false);}}
+            style={{background:init===p?C.yellow:C.surface,color:init===p?"#000":C.steel,border:`1px solid ${init===p?C.yellow:C.border}`,borderRadius:8,padding:"8px 12px",fontSize:13,cursor:"pointer",fontFamily:FC}}>{p}s</button>))}
+        </div>
+        <div style={{display:"flex",gap:10}}>
+          <button onClick={()=>setRun(!run)} style={{flex:1,background:run?C.redDim:C.yellow,color:run?C.text:"#000",border:"none",borderRadius:10,padding:"14px",fontSize:15,fontWeight:"bold",cursor:"pointer",fontFamily:FC,letterSpacing:"0.1em"}}>
+            {run?"PAUSE":"START"}
+          </button>
+          <button onClick={()=>{setSecs(init);setRun(false);}} style={{background:C.surface,color:C.steel,border:`1px solid ${C.border}`,borderRadius:10,padding:"14px 16px",fontSize:13,cursor:"pointer"}}>RESET</button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ── INLINE TIMER ───────────────────────────────────────────────────────────
+const InlineTimer=({seconds,label,onDone})=>{
+  const [secs,setSecs]=useState(seconds);
+  const [done,setDone]=useState(false);
+  const ref=useRef(null);
+  useEffect(()=>{
+    ref.current=setInterval(()=>setSecs(s=>{if(s<=1){clearInterval(ref.current);setDone(true);onDone&&onDone();return 0;}return s-1;}),1000);
+    return()=>clearInterval(ref.current);
+  },[]);
+  const pct=secs/seconds;
+  const col=done?C.green:secs<30?C.red:C.yellow;
+  return(
+    <div style={{background:C.surface,borderRadius:10,padding:"10px 14px",marginTop:8,display:"flex",alignItems:"center",gap:12,border:`1px solid ${col}44`}}>
+      <div style={{width:40,height:40,flexShrink:0,position:"relative",display:"flex",alignItems:"center",justifyContent:"center"}}>
+        <svg width="40" height="40" viewBox="0 0 40 40" style={{position:"absolute"}}>
+          <circle cx="20" cy="20" r="17" fill="none" stroke={C.border} strokeWidth="3"/>
+          <circle cx="20" cy="20" r="17" fill="none" stroke={col} strokeWidth="3"
+            strokeDasharray="106.8" strokeDashoffset={106.8*(1-pct)} strokeLinecap="round"
+            transform="rotate(-90 20 20)" style={{transition:"stroke-dashoffset 1s linear"}}/>
+        </svg>
+        <span style={{fontSize:9,fontWeight:"bold",fontFamily:FC,color:col,position:"relative",zIndex:1,textAlign:"center"}}>
+          {done?"GO":secs>=60?`${Math.floor(secs/60)}:${String(secs%60).padStart(2,"0")}`:secs}
+        </span>
+      </div>
+      <div>
+        <p style={{margin:0,fontSize:12,fontWeight:"bold",fontFamily:FC,color:done?C.green:C.text}}>{done?"REST DONE - NEXT SET!":(label||"REST")}</p>
+        <p style={{margin:0,fontSize:10,color:C.muted,fontFamily:FB}}>{done?"Go when ready":secs<30?"Almost time...":"Recover fully"}</p>
+      </div>
+    </div>
+  );
+};
+
+// ── RIR SELECTOR ───────────────────────────────────────────────────────────
+const RIRSelect=({value,onChange})=>(
+  <div style={{marginTop:8}}>
+    <p style={{margin:"0 0 5px",fontSize:9,color:C.muted,fontFamily:FC,letterSpacing:"0.12em",textTransform:"uppercase"}}>REPS IN RESERVE</p>
+    <div style={{display:"flex",gap:5}}>
+      {[{v:"0",l:"0",s:"Failure",c:C.red},{v:"1",l:"1",s:"1 left",c:C.orange},{v:"2",l:"2",s:"2 left",c:C.yellow},{v:"3",l:"3+",s:"Easy",c:C.green}].map(o=>(
+        <button key={o.v} onClick={()=>onChange(o.v)} style={{flex:1,padding:"7px 2px",borderRadius:7,background:value===o.v?o.c:"transparent",border:`1px solid ${value===o.v?o.c:C.border}`,cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:1}}>
+          <span style={{fontSize:15,fontWeight:"bold",fontFamily:FC,color:value===o.v?"#000":o.c}}>{o.l}</span>
+          <span style={{fontSize:8,color:value===o.v?"#000":C.muted,fontFamily:FC}}>{o.s}</span>
+        </button>
+      ))}
+    </div>
+  </div>
+);
+
+// ── MEAL BLOCK ─────────────────────────────────────────────────────────────
+const MealBlock=({section,title,emoji,pc})=>{
+  const [open,setOpen]=useState(true);
+  return(
+    <div style={{background:C.card,borderRadius:12,border:`1px solid ${C.border}`,marginBottom:10,overflow:"hidden"}}>
+      <button onClick={()=>setOpen(!open)} style={{width:"100%",background:"none",border:"none",cursor:"pointer",padding:"12px 16px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+        <div style={{display:"flex",alignItems:"center",gap:10}}>
+          <span style={{fontSize:22}}>{emoji}</span>
+          <div style={{textAlign:"left"}}>
+            <p style={{margin:0,fontSize:16,fontFamily:FC,fontWeight:700,color:C.text}}>{title}</p>
+            <p style={{margin:0,fontSize:10,color:pc,fontFamily:FC,letterSpacing:"0.1em"}}>{section.time}</p>
+          </div>
+        </div>
+        <span style={{color:C.muted,fontSize:14}}>{open?"^":"v"}</span>
+      </button>
+      {open&&(
+        <div style={{padding:"0 12px 14px"}}>
+          <div style={{background:C.surface,borderRadius:8,overflow:"hidden",marginBottom:8,border:`1px solid ${C.border}`}}>
+            <div style={{display:"flex",alignItems:"center",background:C.dim,padding:"6px 10px",borderBottom:`1px solid ${C.border}`}}>
+              <div style={{flex:1,fontSize:9,color:C.muted,fontFamily:FC,letterSpacing:"0.1em"}}>ITEM</div>
+              {["CAL","P","C","F"].map(h=>(<div key={h} style={{width:38,fontSize:9,color:C.muted,fontFamily:FC,textAlign:"center"}}>{h}</div>))}
+            </div>
+            {section.items.map((item,i)=>(
+              <div key={i} style={{display:"flex",alignItems:"center",padding:"9px 10px",borderBottom:i<section.items.length-1?`1px solid ${C.border}33`:"none",background:i%2===0?"transparent":"#ffffff06"}}>
+                <div style={{flex:1,minWidth:0,paddingRight:8}}>
+                  <p style={{margin:0,fontSize:11,fontFamily:FC,fontWeight:700,color:item.xs?C.red:C.text,lineHeight:1.3}}>{item.l}</p>
+                  <p style={{margin:"2px 0 0",fontSize:10,color:C.muted,fontFamily:FB,lineHeight:1.3}}>{item.d}</p>
+                </div>
+                <div style={{width:38,textAlign:"center",flexShrink:0}}><span style={{fontSize:11,fontFamily:FC,fontWeight:"bold",color:C.yellow}}>{item.cal}</span></div>
+                <div style={{width:38,textAlign:"center",flexShrink:0}}><span style={{fontSize:11,fontFamily:FC,fontWeight:"bold",color:C.green}}>{item.p}g</span></div>
+                <div style={{width:38,textAlign:"center",flexShrink:0}}><span style={{fontSize:11,fontFamily:FC,fontWeight:"bold",color:C.blue}}>{item.c}g</span></div>
+                <div style={{width:38,textAlign:"center",flexShrink:0}}><span style={{fontSize:11,fontFamily:FC,fontWeight:"bold",color:C.steel}}>{item.f}g</span></div>
+              </div>
+            ))}
+          </div>
+          {section.supps&&section.supps.length>0&&(
+            <div style={{background:C.green+"11",borderRadius:8,padding:"8px 12px",marginBottom:8,border:`1px solid ${C.green}33`}}>
+              <p style={{margin:"0 0 5px",fontSize:9,color:C.greenBright,fontFamily:FC,letterSpacing:"0.15em",textTransform:"uppercase"}}>Supplements with this meal</p>
+              <div style={{display:"flex",flexWrap:"wrap",gap:4}}>
+                {section.supps.map((s,i)=>(<span key={i} style={{fontSize:10,padding:"3px 9px",borderRadius:12,background:C.green+"22",color:C.greenBright,border:`1px solid ${C.green}44`,fontFamily:FC}}>{s}</span>))}
+              </div>
+            </div>
+          )}
+          <p style={{margin:0,fontSize:11,color:C.muted,fontStyle:"italic",fontFamily:FB,lineHeight:1.5}}>{section.note}</p>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ── SUPP CARD ──────────────────────────────────────────────────────────────
+const SuppCard=({s,showCaff})=>{
+  const [open,setOpen]=useState(false);
+  return(
+    <div style={{background:C.card,borderRadius:12,marginBottom:8,border:`1px solid ${C.border}`,borderLeft:`3px solid ${s.color}`,overflow:"hidden"}}>
+      <button onClick={()=>setOpen(!open)} style={{width:"100%",background:"none",border:"none",cursor:"pointer",padding:"12px 14px",display:"flex",justifyContent:"space-between",alignItems:"flex-start",textAlign:"left",gap:8}}>
+        <div style={{flex:1}}>
+          <p style={{margin:0,fontSize:13,fontFamily:FC,fontWeight:700,color:s.color}}>{s.name}</p>
+          <p style={{margin:"2px 0 0",fontSize:10,color:C.muted,fontFamily:FB}}>{s.timing}</p>
+        </div>
+        <div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
+          {showCaff&&s.caff>0&&<span style={{fontSize:9,padding:"2px 7px",borderRadius:4,background:C.red+"22",color:C.red,fontFamily:FC,fontWeight:700}}>{s.caff}mg</span>}
+          <span style={{color:C.muted,fontSize:14}}>{open?"^":"v"}</span>
+        </div>
+      </button>
+      {open&&(
+        <div style={{padding:"0 14px 12px"}}>
+          <p style={{margin:"0 0 8px",fontSize:10,color:C.muted,fontFamily:FC,letterSpacing:"0.15em",textTransform:"uppercase"}}>Ingredients</p>
+          {(s.ingredients||[]).map((ing,j)=>(<p key={j} style={{margin:"0 0 4px",fontSize:11,color:C.steel,fontFamily:FB,lineHeight:1.4,paddingLeft:8,borderLeft:`2px solid ${s.color}44`}}>{ing}</p>))}
+          <div style={{background:C.surface,borderRadius:8,padding:"8px 10px",marginTop:8}}>
+            <p style={{margin:"0 0 3px",fontSize:9,color:s.color,fontFamily:FC,letterSpacing:"0.1em",textTransform:"uppercase"}}>Dose: {s.dose}</p>
+            <p style={{margin:0,fontSize:11,color:C.muted,fontStyle:"italic",fontFamily:FB,lineHeight:1.4}}>{s.why}</p>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ── LOG MODAL (Full Progressive Overload) ─────────────────────────────────
+const LogModal=({ex,pc,lastSets,targets,week,phase,allHistory,onSave,onClose})=>{
+  const baseline=!week||week<=1;
+  const compound=isCompound(ex.n);
+  const restSecs=compound?150:60;
+  const workSets=(lastSets||[]).filter(s=>!s.isWarmup&&!s.isBurnout);
+  const lastWeight=parseFloat(workSets[0]?.w)||0;
+  const suggestedWarmups=lastWeight>0?calcWarmups(lastWeight.toString(),ex):[];
+  const initSets=workSets.length>0
+    ?workSets.map(s=>({...s,rir:s.rir||"",logged:false}))
+    :Array.from({length:ex.s},()=>({r:"",w:"",rir:"",logged:false}));
+  const [sets,setSets]=useState(initSets);
+  const [warmupIdx,setWarmupIdx]=useState(0);
+  const [warmupsLogged,setWarmupsLogged]=useState(false);
+  const [activeSet,setActiveSet]=useState(0);
+  const [restTimer,setRestTimer]=useState(null);
+  const [timerKey,setTimerKey]=useState(0);
+  const [burnoutReady,setBurnoutReady]=useState(false);
+  const [showBurnout,setShowBurnout]=useState(false);
+  const [burnout,setBurnout]=useState({w:"",r:"",rir:""});
+  const [sessionNote,setSessionNote]=useState("");
+  const [showHistory,setShowHistory]=useState(false);
+  const [showWarmups,setShowWarmups]=useState(compound&&!ex.nw);
+
+  const upd=(i,f,v)=>setSets(p=>p.map((s,idx)=>idx===i?{...s,[f]:v}:s));
+  const updB=(f,v)=>setBurnout(b=>({...b,[f]:v}));
+
+  const logSet=(i)=>{
+    setSets(p=>p.map((s,idx)=>idx===i?{...s,logged:true}:s));
+    const isLast=i===sets.length-1;
+    const label=compound?"2.5 MIN REST":"60s REST";
+    if(isLast&&phase>=1){
+      setRestTimer({secs:180,label:"BURNOUT REST - 3 MIN"});
+      setTimerKey(k=>k+1);
+    } else {
+      setRestTimer({secs:restSecs,label});
+      setTimerKey(k=>k+1);
+      setActiveSet(Math.min(i+1,sets.length-1));
+    }
+    if(isLast&&phase>=1){
+      setTimeout(()=>setBurnoutReady(true),180000);
+    }
+  };
+
+  const getStatus=(i)=>{
+    if(baseline||!targets||!targets[i]) return "base";
+    const s=sets[i];if(!s.logged)return "base";
+    const tW=parseFloat(targets[i]?.w)||0,tR=parseInt(targets[i]?.r)||0;
+    const aW=parseFloat(s.w)||0,aR=parseInt(s.r)||0;
+    if(aW>=tW&&aR>=tR)return "hit";
+    if(aW>=tW*0.95&&aR>=tR-1)return "close";
+    return "miss";
+  };
+  const SC={hit:C.green,close:C.yellow,miss:C.red,base:C.border};
+  const SL={hit:"HIT",close:"CLOSE",miss:"MISSED",base:""};
+
+  const est1RM=()=>{
+    const topSet=sets.filter(s=>s.logged&&!s.isBurnout&&s.w&&s.r).sort((a,b)=>parseFloat(b.w)-parseFloat(a.w))[0];
+    if(!topSet)return null;
+    return calc1RM(topSet.w,topSet.r);
+  };
+
+  const vol=calcVolume(sets.filter(s=>s.logged));
+  const prev1RM=allHistory&&allHistory.length>0?allHistory.reduce((best,wk)=>{
+    const top=(wk||[]).filter(s=>!s.isWarmup&&!s.isBurnout&&s.w&&s.r).sort((a,b)=>parseFloat(b.w)-parseFloat(a.w))[0];
+    const rm=top?calc1RM(top.w,top.r):0;
+    return rm>best?rm:best;
+  },0):0;
+  const current1RM=est1RM();
+  const isPR=current1RM&&prev1RM&&current1RM>prev1RM;
+
+  return(
+    <div style={{position:"fixed",inset:0,zIndex:200,display:"flex",alignItems:"flex-end",background:"rgba(0,0,0,0.92)"}} onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
+      <div style={{width:"100%",maxWidth:430,margin:"0 auto",background:C.card,borderRadius:"16px 16px 0 0",padding:"20px 16px 40px",borderBottom:"none",maxHeight:"92vh",overflowY:"auto"}}>
+
+        {/* Header */}
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:12}}>
+          <div style={{flex:1,paddingRight:8}}>
+            <p style={{margin:0,fontSize:10,color:pc,letterSpacing:"0.2em",textTransform:"uppercase",fontFamily:FC}}>
+              {baseline?"WEEK 1 - SET BASELINE":"WEEK "+(week||1)+" TARGETS"}
+            </p>
+            <p style={{margin:"2px 0 4px",fontSize:17,fontWeight:"bold",fontFamily:FC}}>{ex.n}</p>
+            <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
+              <span style={{fontSize:9,padding:"2px 8px",borderRadius:4,background:pc+"22",color:pc,fontFamily:FC}}>
+                {ex.s} sets x {ex.r}{typeof ex.r==="number"?" reps":""}
+              </span>
+              <span style={{fontSize:9,padding:"2px 8px",borderRadius:4,background:C.surface,color:C.muted,fontFamily:FC}}>
+                {compound?"Compound 2.5min":"Isolation 60s"}
+              </span>
+              {phase>=1&&<span style={{fontSize:9,padding:"2px 8px",borderRadius:4,background:C.red+"22",color:C.red,fontFamily:FC}}>BURNOUT</span>}
+            </div>
+          </div>
+          <div style={{display:"flex",gap:6,flexShrink:0}}>
+            {allHistory&&allHistory.length>0&&(
+              <button onClick={()=>setShowHistory(!showHistory)} style={{background:C.surface,border:`1px solid ${C.border}`,borderRadius:8,padding:"6px 8px",cursor:"pointer",fontSize:9,color:C.steel,fontFamily:FC}}>
+                HISTORY
+              </button>
+            )}
+            <button onClick={onClose} style={{background:"transparent",border:"none",cursor:"pointer",padding:4}}>
+              <Ic n="x" sz={22} col={C.steel}/>
+            </button>
+          </div>
+        </div>
+
+        {/* Exercise history */}
+        {showHistory&&allHistory&&(
+          <div style={{background:C.surface,borderRadius:10,padding:"12px 14px",marginBottom:12,border:`1px solid ${C.border}`}}>
+            <p style={{margin:"0 0 8px",fontSize:11,color:C.yellow,fontFamily:FC,letterSpacing:"0.1em",textTransform:"uppercase"}}>Exercise History</p>
+            {allHistory.map((wkSets,i)=>{
+              const ws=(wkSets||[]).filter(s=>!s.isWarmup&&!s.isBurnout);
+              const rm=ws[0]?calc1RM(ws[0].w,ws[0].r):0;
+              const v=calcVolume(ws);
+              return(
+                <div key={i} style={{marginBottom:6,paddingBottom:6,borderBottom:i<allHistory.length-1?`1px solid ${C.border}22`:"none"}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:3}}>
+                    <span style={{fontSize:11,fontFamily:FC,color:C.muted}}>Week {i+1}</span>
+                    <div style={{display:"flex",gap:8}}>
+                      {rm>0&&<span style={{fontSize:10,fontFamily:FC,color:C.yellow}}>~1RM: {rm}lb</span>}
+                      {v>0&&<span style={{fontSize:10,fontFamily:FC,color:C.steel}}>{Math.round(v).toLocaleString()}lb vol</span>}
+                    </div>
+                  </div>
+                  <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
+                    {ws.map((s,j)=>(
+                      <span key={j} style={{fontSize:9,padding:"2px 7px",borderRadius:5,background:C.card,color:C.steel,fontFamily:FC}}>
+                        {s.w?`${s.w}lb`:"BW"} x {s.r}{s.rir!==undefined&&s.rir!==""?` RIR${s.rir}`:""}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Baseline notice */}
+        {baseline&&(
+          <div style={{background:C.yellow+"22",borderRadius:8,padding:"9px 12px",marginBottom:12,border:`1px solid ${C.yellow}44`}}>
+            <p style={{margin:0,fontSize:11,color:C.yellow,fontFamily:FB,lineHeight:1.5}}>
+              Week 1 - Log your real working weights. Week 2+ calculates targets automatically. Hit all reps + RIR 0-1 = weight goes up. Miss reps = same weight repeated.
+            </p>
+          </div>
+        )}
+
+        {/* Warm-up sets */}
+        {showWarmups&&suggestedWarmups.length>0&&!warmupsLogged&&(
+          <div style={{background:C.surface,borderRadius:10,padding:"12px 14px",marginBottom:12,border:`1px solid ${C.border}`}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+              <p style={{margin:0,fontSize:11,fontFamily:FC,color:C.steel,letterSpacing:"0.1em",textTransform:"uppercase"}}>Warm-Up Sets</p>
+              <button onClick={()=>setShowWarmups(false)} style={{background:"none",border:"none",cursor:"pointer",fontSize:10,color:C.muted,fontFamily:FC}}>SKIP</button>
+            </div>
+            {suggestedWarmups.map((wu,i)=>(
+              <div key={i} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"7px 0",borderBottom:i<suggestedWarmups.length-1?`1px solid ${C.border}33`:"none"}}>
+                <span style={{fontSize:11,color:C.muted,fontFamily:FC}}>{wu.label}</span>
+                <div style={{display:"flex",gap:10,alignItems:"center"}}>
+                  <span style={{fontSize:13,fontWeight:"bold",fontFamily:FC,color:C.steel}}>{wu.w}lb x {wu.r}</span>
+                  {i===warmupIdx&&(
+                    <button onClick={()=>{if(i===suggestedWarmups.length-1)setWarmupsLogged(true);else setWarmupIdx(i+1);}}
+                      style={{background:C.steel+"33",border:`1px solid ${C.steel}44`,borderRadius:6,padding:"4px 10px",fontSize:10,color:C.steel,cursor:"pointer",fontFamily:FC}}>
+                      DONE
+                    </button>
+                  )}
+                  {i<warmupIdx&&<span style={{fontSize:10,color:C.green,fontFamily:FC}}>done</span>}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Working sets */}
+        {sets.map((s,i)=>{
+          const status=getStatus(i);
+          const sc=SC[status];
+          const target=targets&&targets[i];
+          const isActive=i===activeSet&&!s.logged;
+          return(
+            <div key={i} style={{borderRadius:10,padding:"12px 14px",marginBottom:8,
+              background:s.logged?sc+"11":isActive?pc+"11":C.surface,
+              border:`1px solid ${s.logged?sc+"66":isActive?pc+"44":C.border}`,
+              transition:"all 0.3s"}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+                <div style={{display:"flex",alignItems:"center",gap:8}}>
+                  <span style={{fontSize:11,fontFamily:FC,fontWeight:700,color:isActive?pc:C.muted,letterSpacing:"0.1em"}}>SET {i+1}</span>
+                  {isActive&&!s.logged&&<span style={{fontSize:9,padding:"2px 7px",borderRadius:4,background:pc,color:"#000",fontFamily:FC,fontWeight:700}}>ACTIVE</span>}
+                  {s.logged&&status!=="base"&&<span style={{fontSize:9,padding:"2px 7px",borderRadius:4,background:sc+"22",color:sc,fontFamily:FC}}>{SL[status]}</span>}
+                </div>
+                {target&&!baseline&&(
+                  <span style={{fontSize:10,color:C.muted,fontFamily:FC}}>
+                    Target: {target.isBurnout?"BURNOUT":target.w+"lb x "+target.r}
+                  </span>
+                )}
+              </div>
+              <div style={{display:"flex",gap:8}}>
+                {!ex.nw&&(
+                  <div style={{flex:1}}>
+                    <p style={{margin:"0 0 4px",fontSize:9,color:C.muted,fontFamily:FC,letterSpacing:"0.1em"}}>WEIGHT (lbs)</p>
+                    <input value={s.w} onChange={e=>upd(i,"w",e.target.value)}
+                      placeholder={target&&!baseline?target.w:"0"} type="number"
+                      style={{width:"100%",background:C.bg,border:`1px solid ${isActive?pc+"88":C.border}`,borderRadius:8,padding:"10px",color:C.text,fontSize:20,fontFamily:FC,outline:"none",textAlign:"center",fontWeight:"bold"}}/>
+                  </div>
+                )}
+                <div style={{flex:1}}>
+                  <p style={{margin:"0 0 4px",fontSize:9,color:C.muted,fontFamily:FC,letterSpacing:"0.1em"}}>REPS</p>
+                  <input value={s.r} onChange={e=>upd(i,"r",e.target.value)}
+                    placeholder={target&&!baseline?target.r:typeof ex.r==="number"?String(ex.r):ex.r||"0"}
+                    style={{width:"100%",background:C.bg,border:`1px solid ${isActive?pc+"88":C.border}`,borderRadius:8,padding:"10px",color:C.text,fontSize:20,fontFamily:FC,outline:"none",textAlign:"center",fontWeight:"bold"}}/>
+                </div>
+              </div>
+              <RIRSelect value={s.rir} onChange={v=>upd(i,"rir",v)}/>
+              {!s.logged&&(
+                <button onClick={()=>logSet(i)}
+                  style={{width:"100%",marginTop:10,background:isActive?pc:C.surface,color:isActive?"#000":C.muted,border:`1px solid ${isActive?pc:C.border}`,borderRadius:8,padding:"11px",fontSize:12,fontWeight:"bold",cursor:"pointer",fontFamily:FC,letterSpacing:"0.1em",textTransform:"uppercase"}}>
+                  LOG SET {i+1}
+                </button>
+              )}
+            </div>
+          );
+        })}
+
+        {/* Live 1RM + Volume */}
+        {sets.some(s=>s.logged&&s.w&&s.r)&&(
+          <div style={{background:C.surface,borderRadius:10,padding:"10px 14px",marginBottom:8,display:"flex",gap:12,border:`1px solid ${C.border}`}}>
+            {current1RM&&(
+              <div style={{flex:1,textAlign:"center"}}>
+                <p style={{margin:0,fontSize:9,color:C.muted,fontFamily:FC,letterSpacing:"0.1em"}}>EST 1RM</p>
+                <p style={{margin:0,fontSize:18,fontWeight:"bold",fontFamily:FD,color:isPR?C.yellow:C.text}}>
+                  {current1RM}lb {isPR&&"PR!"}
+                </p>
+                {isPR&&<p style={{margin:0,fontSize:9,color:C.yellow,fontFamily:FC}}>NEW RECORD +{current1RM-prev1RM}lb</p>}
+              </div>
+            )}
+            {vol>0&&(
+              <div style={{flex:1,textAlign:"center",borderLeft:`1px solid ${C.border}`,paddingLeft:12}}>
+                <p style={{margin:0,fontSize:9,color:C.muted,fontFamily:FC,letterSpacing:"0.1em"}}>SESSION VOLUME</p>
+                <p style={{margin:0,fontSize:18,fontWeight:"bold",fontFamily:FD,color:C.steel}}>{Math.round(vol).toLocaleString()}lb</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Rest timer */}
+        {restTimer&&<InlineTimer key={timerKey} seconds={restTimer.secs} label={restTimer.label} onDone={()=>{if(phase>=1&&sets.every(s=>s.logged))setBurnoutReady(true);}}/>}
+
+        {/* Burnout section */}
+        {phase>=1&&sets.every(s=>s.logged)&&!showBurnout&&(
+          <div style={{background:C.red+"22",borderRadius:10,padding:"14px",border:`1px solid ${C.red}66`,marginTop:8}}>
+            <p style={{margin:"0 0 4px",fontSize:16,fontFamily:FD,color:C.red}}>BURNOUT SET</p>
+            <p style={{margin:"0 0 10px",fontSize:11,color:C.muted,fontFamily:FB,lineHeight:1.5}}>
+              {burnoutReady?"REST DONE. Drop 30%. Go to absolute failure. Every last rep.":"Rest 3 min then go to absolute failure. Drop 30% of working weight."}
+            </p>
+            {burnoutReady&&(
+              <button onClick={()=>setShowBurnout(true)}
+                style={{width:"100%",background:C.red,color:"#000",border:"none",borderRadius:8,padding:"12px",fontSize:14,fontWeight:"bold",cursor:"pointer",fontFamily:FC,letterSpacing:"0.1em",textTransform:"uppercase"}}>
+                LOG BURNOUT SET
+              </button>
+            )}
+          </div>
+        )}
+        {showBurnout&&(
+          <div style={{background:C.red+"22",borderRadius:10,padding:"14px",border:`1px solid ${C.red}`,marginTop:8}}>
+            <p style={{margin:"0 0 10px",fontSize:16,fontFamily:FD,color:C.red}}>BURNOUT - ABSOLUTE FAILURE</p>
+            <div style={{display:"flex",gap:8,marginBottom:8}}>
+              {!ex.nw&&(
+                <div style={{flex:1}}>
+                  <p style={{margin:"0 0 4px",fontSize:9,color:C.red,fontFamily:FC}}>WEIGHT (-30%)</p>
+                  <input value={burnout.w} onChange={e=>updB("w",e.target.value)}
+                    placeholder={sets[0]?.w?String(Math.round(parseFloat(sets[0].w)*0.7)):""}
+                    type="number" style={{width:"100%",background:C.bg,border:`1px solid ${C.red}`,borderRadius:8,padding:"10px",color:C.red,fontSize:20,fontFamily:FC,outline:"none",textAlign:"center",fontWeight:"bold"}}/>
+                </div>
+              )}
+              <div style={{flex:1}}>
+                <p style={{margin:"0 0 4px",fontSize:9,color:C.red,fontFamily:FC}}>REPS TO FAILURE</p>
+                <input value={burnout.r} onChange={e=>updB("r",e.target.value)}
+                  placeholder="MAX" style={{width:"100%",background:C.bg,border:`1px solid ${C.red}`,borderRadius:8,padding:"10px",color:C.red,fontSize:20,fontFamily:FC,outline:"none",textAlign:"center",fontWeight:"bold"}}/>
+              </div>
+            </div>
+            <RIRSelect value={burnout.rir} onChange={v=>updB("rir",v)}/>
+            <button onClick={()=>{onSave([...sets,{...burnout,isBurnout:true,logged:true}],sessionNote);}}
+              style={{width:"100%",marginTop:12,background:C.red,color:"#000",border:"none",borderRadius:8,padding:"14px",fontSize:15,fontWeight:"bold",cursor:"pointer",fontFamily:FC,letterSpacing:"0.1em",textTransform:"uppercase"}}>
+              SAVE + FINISH SESSION
+            </button>
+          </div>
+        )}
+
+        {/* Session note */}
+        <div style={{marginTop:10}}>
+          <p style={{margin:"0 0 4px",fontSize:9,color:C.muted,fontFamily:FC,letterSpacing:"0.1em",textTransform:"uppercase"}}>Session Notes (optional)</p>
+          <input value={sessionNote} onChange={e=>setSessionNote(e.target.value)}
+            placeholder="Shoulder felt tight, energy was low, new PR..."
+            style={{width:"100%",background:C.surface,border:`1px solid ${C.border}`,borderRadius:8,padding:"9px 12px",color:C.text,fontSize:13,fontFamily:FB,outline:"none",boxSizing:"border-box"}}/>
+        </div>
+
+        {/* Phase 1 save */}
+        {phase===0&&(
+          <button onClick={()=>onSave(sets,sessionNote)}
+            style={{width:"100%",background:pc,color:"#000",border:"none",borderRadius:10,padding:"14px",fontSize:15,fontWeight:"bold",cursor:"pointer",fontFamily:FC,letterSpacing:"0.1em",marginTop:12,textTransform:"uppercase"}}>
+            SAVE ALL SETS
+          </button>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// ── SESSION COMPLETE MODAL ─────────────────────────────────────────────────
+const SessionComplete=({wo,data,ph,di,week,onClose})=>{
+  const exercises=wo.ex;
+  const totalVol=exercises.reduce((sum,ex,i)=>{
+    const sets=(data[`p${ph}_d${di}_e${i}_w${week}`]||[]).filter(s=>!s.isWarmup);
+    return sum+calcVolume(sets);
+  },0);
+  const PRs=exercises.reduce((acc,ex,i)=>{
+    const sets=(data[`p${ph}_d${di}_e${i}_w${week}`]||[]).filter(s=>!s.isWarmup&&!s.isBurnout);
+    const top=sets.sort((a,b)=>parseFloat(b.w)-parseFloat(a.w))[0];
+    if(!top||!top.w||!top.r)return acc;
+    const rm=calc1RM(top.w,top.r);
+    const hist=Array.from({length:week-1},(_,w)=>data[`p${ph}_d${di}_e${i}_w${w+1}`]||[]);
+    const prevBest=hist.reduce((best,wkSets)=>{
+      const t=(wkSets||[]).filter(s=>!s.isWarmup&&!s.isBurnout).sort((a,b)=>parseFloat(b.w)-parseFloat(a.w))[0];
+      const r=t?calc1RM(t.w,t.r):0;return r>best?r:best;
+    },0);
+    if(rm>prevBest&&prevBest>0)acc.push({name:ex.n,rm,prev:prevBest,gain:rm-prevBest});
+    return acc;
+  },[]);
+  const doneCount=exercises.filter((_,i)=>!!data[`done_p${ph}_d${di}_e${i}`]).length;
+  const nextDay=PHASES[ph].label+" "+(di<3?"Day "+(di+2):"— Rest then Day A");
+  return(
+    <div style={{position:"fixed",inset:0,zIndex:300,display:"flex",alignItems:"center",justifyContent:"center",background:"rgba(0,0,0,0.95)",padding:16}}>
+      <div style={{width:"100%",maxWidth:400,background:C.card,borderRadius:16,padding:"24px 20px",border:`1px solid ${PHASES[ph].color}44`,maxHeight:"85vh",overflowY:"auto"}}>
+        <div style={{textAlign:"center",marginBottom:20}}>
+          <p style={{margin:"0 0 4px",fontSize:44,lineHeight:1}}>d</p>
+          <p style={{margin:0,fontSize:30,fontFamily:FD,color:PHASES[ph].color,letterSpacing:"0.1em"}}>SESSION COMPLETE</p>
+          <p style={{margin:"4px 0 0",fontSize:12,color:C.muted,fontFamily:FB}}>Week {week} - {wo.label}</p>
+        </div>
+        <div style={{display:"flex",gap:8,marginBottom:16}}>
+          <div style={{flex:1,background:C.surface,borderRadius:10,padding:"12px",textAlign:"center",borderTop:`2px solid ${PHASES[ph].color}`}}>
+            <p style={{margin:0,fontSize:9,color:C.muted,fontFamily:FC,letterSpacing:"0.1em"}}>EXERCISES</p>
+            <p style={{margin:0,fontSize:22,fontFamily:FD,color:PHASES[ph].color}}>{doneCount}/{exercises.length}</p>
+          </div>
+          <div style={{flex:1,background:C.surface,borderRadius:10,padding:"12px",textAlign:"center",borderTop:`2px solid ${C.yellow}`}}>
+            <p style={{margin:0,fontSize:9,color:C.muted,fontFamily:FC,letterSpacing:"0.1em"}}>VOLUME</p>
+            <p style={{margin:0,fontSize:22,fontFamily:FD,color:C.yellow}}>{Math.round(totalVol/1000).toFixed(1)}K lb</p>
+          </div>
+          <div style={{flex:1,background:C.surface,borderRadius:10,padding:"12px",textAlign:"center",borderTop:`2px solid ${C.red}`}}>
+            <p style={{margin:0,fontSize:9,color:C.muted,fontFamily:FC,letterSpacing:"0.1em"}}>PRs</p>
+            <p style={{margin:0,fontSize:22,fontFamily:FD,color:C.red}}>{PRs.length}</p>
+          </div>
+        </div>
+        {PRs.length>0&&(
+          <div style={{background:C.yellow+"22",borderRadius:10,padding:"12px 14px",marginBottom:12,border:`1px solid ${C.yellow}44`}}>
+            <p style={{margin:"0 0 8px",fontSize:12,fontFamily:FD,color:C.yellow,letterSpacing:"0.05em"}}>NEW PERSONAL RECORDS</p>
+            {PRs.map((pr,i)=>(
+              <div key={i} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"5px 0",borderBottom:i<PRs.length-1?`1px solid ${C.yellow}22`:"none"}}>
+                <span style={{fontSize:11,color:C.text,fontFamily:FC}}>{pr.name}</span>
+                <div style={{textAlign:"right"}}>
+                  <span style={{fontSize:13,fontWeight:"bold",color:C.yellow,fontFamily:FC}}>{pr.rm}lb 1RM</span>
+                  <span style={{fontSize:10,color:C.greenBright,fontFamily:FC,marginLeft:8}}>+{pr.gain}lb</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+        <div style={{background:C.surface,borderRadius:10,padding:"10px 14px",marginBottom:16,border:`1px solid ${C.border}`}}>
+          <p style={{margin:0,fontSize:11,color:C.muted,fontFamily:FB}}>Next: <span style={{color:C.text,fontWeight:"bold"}}>{nextDay}</span></p>
+          {isDeload(week+1)&&<p style={{margin:"4px 0 0",fontSize:11,color:C.yellow,fontFamily:FB}}>Week {week+1} is a DELOAD week - 60% volume, same weights. Recovery is gains.</p>}
+        </div>
+        <button onClick={onClose}
+          style={{width:"100%",background:PHASES[ph].color,color:"#000",border:"none",borderRadius:10,padding:"14px",fontSize:15,fontWeight:"bold",cursor:"pointer",fontFamily:FC,letterSpacing:"0.1em",textTransform:"uppercase"}}>
+          NICE WORK - DONE
+        </button>
+      </div>
+    </div>
+  );
+};
+
+// ── MAIN APP ───────────────────────────────────────────────────────────────
+// ── LOGIN SCREEN ───────────────────────────────────────────────────────────
+const LoginScreen = ({onLogin}) => {
+  const [pin, setPin] = useState("");
+  const [error, setError] = useState("");
+  const [selectedUser, setSelectedUser] = useState(null);
+
+  const handlePinPress = (digit) => {
+    if (pin.length >= 4) return;
+    const newPin = pin + digit;
+    setPin(newPin);
+    setError("");
+    if (newPin.length === 4) {
+      setTimeout(() => {
+        if (USERS[newPin]) {
+          onLogin(newPin);
+        } else {
+          setError("Wrong PIN. Try again.");
+          setPin("");
+        }
+      }, 200);
+    }
+  };
+
+  const handleClear = () => { setPin(""); setError(""); };
+
+  return (
+    <div style={{background:C.bg,minHeight:"100vh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:24,maxWidth:430,margin:"0 auto"}}>
+      {/* Logo */}
+      <div style={{textAlign:"center",marginBottom:32}}>
+        <p style={{margin:"0 0 2px",fontSize:13,color:C.yellow,letterSpacing:"0.4em",fontFamily:FC}}>HUSTLE & HEART</p>
+        <p style={{margin:0,fontSize:48,fontFamily:FD,letterSpacing:"0.1em",color:C.text,lineHeight:1}}>BIG & SCARY</p>
+        <p style={{margin:"6px 0 0",fontSize:12,color:C.muted,fontFamily:FB}}>12-Week Transformation Program</p>
+      </div>
+
+      {/* User selection */}
+      <div style={{width:"100%",marginBottom:28}}>
+        <p style={{margin:"0 0 12px",fontSize:10,color:C.muted,letterSpacing:"0.2em",textTransform:"uppercase",fontFamily:FC,textAlign:"center"}}>Who's training?</p>
+        <div style={{display:"flex",gap:10}}>
+          {Object.entries(USERS).map(([p, u]) => (
+            <button key={p} onClick={() => { setSelectedUser(p); setPin(""); setError(""); }}
+              style={{flex:1,padding:"16px 8px",borderRadius:12,cursor:"pointer",textAlign:"center",
+                background: selectedUser===p ? C.yellow+"22" : C.card,
+                border: `2px solid ${selectedUser===p ? C.yellow : C.border}`,
+                transition:"all 0.2s"}}>
+                <p style={{margin:0,fontSize:22,fontFamily:FD,letterSpacing:"0.08em",
+                color: selectedUser===p ? C.yellow : C.text}}>{u.name}</p>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* PIN display */}
+      {selectedUser && (
+        <div style={{width:"100%"}}>
+          <p style={{margin:"0 0 10px",fontSize:10,color:C.muted,letterSpacing:"0.2em",textTransform:"uppercase",fontFamily:FC,textAlign:"center"}}>Enter PIN</p>
+          <div style={{display:"flex",gap:12,justifyContent:"center",marginBottom:8}}>
+            {[0,1,2,3].map(i => (
+              <div key={i} style={{width:16,height:16,borderRadius:"50%",
+                background: i < pin.length ? C.yellow : "transparent",
+                border: `2px solid ${i < pin.length ? C.yellow : C.dim}`,
+                transition:"all 0.2s"}}/>
+            ))}
+          </div>
+          {error && <p style={{margin:"0 0 10px",fontSize:12,color:C.red,fontFamily:FB,textAlign:"center"}}>{error}</p>}
+
+          {/* PIN pad */}
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginTop:16}}>
+            {[1,2,3,4,5,6,7,8,9,"",0,"del"].map((d,i) => (
+              <button key={i} onClick={() => d===""?null:d==="del"?handleClear():handlePinPress(String(d))}
+                style={{padding:"18px 8px",borderRadius:12,fontSize:d==="del"?14:22,
+                  fontFamily:d==="del"?FC:FD,fontWeight:"bold",cursor:d===""?"default":"pointer",
+                  background:d===""?"transparent":C.card,
+                  color:d==="del"?C.muted:C.text,
+                  border:`1px solid ${d===""?"transparent":C.border}`,
+                  letterSpacing:d==="del"?"0.05em":"0.1em",
+                  opacity:d===""?0:1,
+                  transition:"all 0.1s"}}>
+                {d==="del"?"CLEAR":d}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <p style={{margin:"24px 0 0",fontSize:10,color:C.dim,fontFamily:FB,textAlign:"center"}}>
+        Andrew: 1111 · Beaudy: 2222
+      </p>
+    </div>
+  );
+};
+
+function AppInner({pin, user, onLogout}){
+  const [data,setData]=useState(()=>load(pin));
+  const [tab,setTab]=useState("workout");
+  const [di,setDi]=useState(0);
+  const [lm,setLm]=useState(null);
+  const [timerOpen,setTimerOpen]=useState(false);
+  const [mealDt,setMealDt]=useState("training");
+  const [suppView,setSuppView]=useState("caff");
+  const [sessionDone,setSessionDone]=useState(false);
+  // scan log state
+  const [scanW,setScanW]=useState("");
+  const [scanBF,setScanBF]=useState("");
+  const [scanM,setScanM]=useState("");
+  const [scanN,setScanN]=useState("");
+  // weight log state
+  const [logW,setLogW]=useState("");
+  const [logSleep,setLogSleep]=useState("");
+  const [logN,setLogN]=useState("");
+  // measurements state
+  const [mWaist,setMWaist]=useState("");
+  const [mChest,setMChest]=useState("");
+  const [mRArm,setMRArm]=useState("");
+  const [mLArm,setMLArm]=useState("");
+  const [mShould,setMShould]=useState("");
+  const [mNote,setMNote]=useState("");
+
+  const persist=useCallback(nd=>{setData(nd);save(nd,pin);},[pin]);
+
+  // Auto week from start date
+  const autoWeek=calcCurrentWeek();
+  const currentWeek=data.weekOverride||autoWeek;
+  const ph=phaseFromWeek(currentWeek);
+  const deload=isDeload(currentWeek);
+  const pc=PHASES[ph].color;
+  const wo=WO[ph][di];
+
+  // Keys
+  const SK2=(p,d,e)=>`p${p}_d${d}_e${e}`;
+  const DK=(p,d,e)=>`done_p${p}_d${d}_e${e}`;
+  const WK=(p,d,e,w)=>`p${p}_d${d}_e${e}_w${w}`;
+  const getLast=ei=>data[SK2(ph,di,ei)];
+  const isDone=ei=>!!data[DK(ph,di,ei)];
+  const getHistory=ei=>Array.from({length:currentWeek-1},(_,i)=>data[WK(ph,di,ei,i+1)]||null).filter(Boolean);
+  const getTargets=ei=>{
+    const last=getLast(ei);
+    if(!last)return null;
+    return calcTarget(last,WO[ph][di].ex[ei],currentWeek,ph);
+  };
+
+  const saveLog=(ei,sets,note)=>{
+    const nd={...data,
+      [SK2(ph,di,ei)]:sets,
+      [DK(ph,di,ei)]:true,
+      [WK(ph,di,ei,currentWeek)]:sets,
+    };
+    if(note){
+      const notes=nd.sessionNotes||{};
+      notes[`${ph}_${di}_w${currentWeek}`]=note;
+      nd.sessionNotes=notes;
+    }
+    persist(nd);
+    setLm(null);
+    // Check if all exercises done
+    const allDone=WO[ph][di].ex.every((_,i)=>i===ei||!!nd[DK(ph,di,i)]);
+    if(allDone)setSessionDone(true);
+  };
+
+  // Daily supplement checklist
+  const today=new Date().toDateString();
+  const isTrainingToday=TRAINING_DAYS_OF_WEEK.includes(new Date().getDay());
+  const todaySupps=DAILY_SUPPS.filter(s=>!s.trainOnly||isTrainingToday);
+  const suppKey=`supps_${today}`;
+  const checkedSupps=data[suppKey]||{};
+  const toggleSupp=(id)=>{
+    const ns={...checkedSupps,[id]:!checkedSupps[id]};
+    persist({...data,[suppKey]:ns});
+  };
+  const suppDoneCount=Object.values(checkedSupps).filter(Boolean).length;
+
+  // Scan / weight save
+  const saveScan=()=>{
+    if(!scanW)return;
+    const scans=data.scans||[];
+    persist({...data,scans:[...scans,{date:new Date().toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"}),w:scanW,bf:scanBF,m:scanM,n:scanN,ts:Date.now()}]});
+    setScanW("");setScanBF("");setScanM("");setScanN("");
+  };
+  const saveWeight=()=>{
+    if(!logW)return;
+    const wlog=data.wlog||[];
+    persist({...data,wlog:[...wlog,{date:new Date().toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"}),w:logW,sleep:logSleep,n:logN,ts:Date.now()}]});
+    setLogW("");setLogSleep("");setLogN("");
+  };
+  const saveMeasurements=()=>{
+    if(!mWaist&&!mChest&&!mRArm)return;
+    const ms=data.measurements||[];
+    persist({...data,measurements:[...ms,{date:new Date().toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"}),waist:mWaist,chest:mChest,rarm:mRArm,larm:mLArm,shoulder:mShould,n:mNote,ts:Date.now()}]});
+    setMWaist("");setMChest("");setMRArm("");setMLArm("");setMShould("");setMNote("");
+  };
+
+  const scans=data.scans||[];
+  const lastScan=scans[scans.length-1];
+  const curBF=lastScan?parseFloat(lastScan.bf):11.6;
+  const bfProg=Math.max(0,Math.min(1,(11.6-curBF)/(11.6-8.5)));
+
+  // NAV
+  const NAV=[
+    {id:"workout",ic:"dumbbell",lb:"Train"},
+    {id:"meals",  ic:"meals",   lb:"Fuel"},
+    {id:"daily",  ic:"daily",   lb:"Daily"},
+    {id:"track",  ic:"track",   lb:"Track"},
+    {id:"mobility",ic:"mobility",lb:"Rehab"},
+  ];
+
+  // Meal plan - auto-syncs to current phase
+  const mp=MEALS.find(m=>m.ph===ph&&m.dt===mealDt)||MEALS[0];
+
+  // SUPPS DATA (inline for brevity)
+  const SUPPS_XS=[
+    {name:"XS Pre-Workout Boost",timing:"5:00 AM training days",caff:115,color:C.red,
+     ingredients:["4g CarnoSyn Beta-Alanine (buffers lactic acid)","3.4g L-Citrulline (nitric oxide + blood flow)","115mg natural caffeine from green tea","100mg Rhodiola Rosea","L-Theanine (smooth energy, no jitters)","1g EAA blend","Mega-dose B6, B12"],
+     dose:"1 serving 20-30 min before training",why:"Clinical doses. The tingling from beta-alanine is normal."},
+    {name:"XS Grass Fed Whey",timing:"Post-workout + nightly",caff:0,color:C.red,
+     ingredients:["30g Whey Protein Isolate from grass-fed cows","6.9g BCAAs","130 cal, 1g carbs","Stevia only - no artificial sweeteners","NSF certified, gluten-free, soy-free"],
+     dose:"2 scoops post-workout. 1 scoop nightly before bed.",why:"Fastest absorbing protein. Night scoop fights muscle loss during short sleep."},
+    {name:"XS Muscle Multiplier",timing:"Post-workout FIRST alone",caff:0,color:C.red,
+     ingredients:["4.1g all 9 Essential Amino Acids","Optimized 5:1:1 BCAA ratio","40% more Leucine (key muscle growth trigger)","25 cal, zero sugar"],
+     dose:"Take ALONE first then mix whey.",why:"All 9 EAAs needed for muscle synthesis. Clinically shown to improve endurance and rep count."},
+    {name:"XS Post-Workout Recovery",timing:"Within 30 min post-training",caff:0,color:C.red,
+     ingredients:["L-Glutamine (muscle cell repair)","XS Muscle Multiplier EAA blend","Glucosamine HCL (joint cartilage)","Turmeric extract (anti-inflammatory)","Vitamin C from Acerola"],
+     dose:"Mix with water or shake within 30 min.",why:"Glucosamine + Turmeric directly targets your AC joint and patellar tendinitis."},
+    {name:"XS Ignite Powder",timing:"Daily - morning or pre-cardio",caff:0,color:C.orange,
+     ingredients:["400mg Morosil Moro Blood Orange (clinically proven fat loss)","2g Isomaltulose (low-GI sustained energy)","200mg L-Glutamine","Vitamin E (antioxidant)","15 cal, 3g carbs, zero caffeine"],
+     dose:"1 sachet daily.",why:"Zero caffeine fat burner. Moro blood orange is one of few ingredients with real human trial data."},
+    {name:"XS Premade Shakes",timing:"Meal 3 or snack",caff:0,color:C.red,
+     ingredients:["25g protein (Whey + Casein blend)","Casein = slow digesting, keeps you full","1g sugar, Inulin prebiotic fiber","Vitamin C from Acerola"],
+     dose:"Snack or meal replacement.",why:"Casein component ideal between meals. Inulin feeds good gut bacteria."},
+    {name:"XS Energy Drink",timing:"Phase-restricted - see Caffeine",caff:114,color:C.orange,
+     ingredients:["114mg natural caffeine per can","Taurine, L-Glutamine","B3 Niacinamide, B5, B6 Pyridoxine, B12 Cyanocobalamin","Folic Acid, Vitamin C","Zero sugar, 15 cal"],
+     dose:"Phase 1: CUT. Phase 2: training days before noon. Phase 3: rest days before 11am.",why:"Never daily. 114mg on top of poor sleep spikes cortisol."},
+  ];
+  const SUPPS_NUT=[
+    {name:"Perfect Pack",timing:"AM packet breakfast / PM packet dinner",caff:0,color:C.green,
+     ingredients:["Double X: 12 vitamins (A,C,D,E,K,B1-B12)","Double X: 10 minerals (Ca,Mg,Zn,Se + more)","22 plant concentrates - PhytoProtect blend","Concentrated Fruits & Veg: equiv 5+ servings","Advanced Omega: 1000mg+ EPA+DHA+ALA","Vitamin D: 50mcg mushroom-derived D3"],
+     dose:"AM packet with breakfast. PM packet with dinner.",why:"Your micronutrient foundation. Omega-3s directly support shoulder and knee joints."},
+    {name:"Liver Health",timing:"With breakfast + lunch (2x daily)",caff:0,color:C.green,
+     ingredients:["Milk Thistle 167mg (Silymarin - liver antioxidant)","Dandelion root (bile flow, liver function)","Turmeric 85% curcuminoids","Acerola Vitamin C","B1, B2, B3, B5, B6, B12"],
+     dose:"1 tablet twice daily with meals.",why:"Supports fat metabolism in deficit. Milk Thistle protects liver from oxidative stress."},
+    {name:"Rhodiola",timing:"With breakfast daily",caff:0,color:C.green,
+     ingredients:["Rhodiola rosea 100mg (Rosavin, Salidroside, Tyrosol)","Vitamin C 30mg from Acerola","Spinach dehydrate 50mg (Glutathione)","Note: Pre-Workout also has 100mg Rhodiola"],
+     dose:"1 tablet with breakfast.",why:"Adaptogen - lowers cortisol, improves sleep quality. CRITICAL given 5-6hr sleep."},
+    {name:"Lion's Mane",timing:"With breakfast daily",caff:0,color:C.purple,
+     ingredients:["Hericium erinaceus mushroom extract","Hericenones + Erinacines (stimulate NGF)","Beta-glucans (immune support)"],
+     dose:"With breakfast daily.",why:"Supports brain health and nervous system. Focus at 5am and recovery nervous system."},
+    {name:"CLA 500",timing:"With lunch + dinner",caff:0,color:C.green,
+     ingredients:["Conjugated Linoleic Acid 500mg per softgel","Derived from 100% safflower oil","Tocopherols (Vitamin E) as antioxidant"],
+     dose:"2 softgels lunch, 2 softgels dinner. Needs dietary fat.",why:"Reduces body fat AND supports lean muscle retention. Must take with fat-containing meals."},
+    {name:"Nutrilite Organics Turmeric",timing:"With lunch or dinner",caff:0,color:C.orange,
+     ingredients:["Turmeric extract 400mg - USDA Certified Organic","45x better absorbed than standard turmeric","Equiv to 6,000mg standard turmeric","Standardized for curcuminoids"],
+     dose:"1-2 capsules with largest fat-containing meal.",why:"Directly targets AC joint and patellar tendinitis. The 45x absorption advantage is real."},
+    {name:"Vision Health",timing:"With dinner",caff:0,color:C.green,
+     ingredients:["Lutein 15mg from Marigold flowers","Zeaxanthin 3mg from Marigold","Lycopene from Tomatoes","Beta-Carotene from Algae","Bilberry + Black Currant anthocyanins","Spinach concentrate"],
+     dose:"2 softgels with dinner.",why:"Fat-soluble - absorbs best with your largest fat-containing meal."},
+    {name:"Carb Blocker",timing:"CHEAT MEALS ONLY",caff:0,color:C.muted,
+     ingredients:["White Kidney Bean extract 500mg (blocks complex carbs)","Fermented Soybean extract 300mg (blocks sugars)","May prevent up to 500 cal absorption per meal"],
+     dose:"2-3 tablets at START of cheat meal only.",why:"NEVER on regular training meals. Use only for high-carb off-plan meals. Never more than once a week."},
+  ];
+  const CAFF_PHASES=[
+    {ph:0,label:"Phase 1",weeks:"Wks 1-4",color:C.blue,total:"115mg",
+     items:[{name:"XS Pre-Workout",mg:115,status:"on",time:"5:00 AM"},{name:"Coffee",mg:100,status:"cut",time:"Cut completely"},{name:"XS Energy Drink",mg:114,status:"cut",time:"Cut completely"}],
+     goal:"Clean baseline. Cortisol reset. Assess sleep.",
+     note:"Cortisol peaks at 5am. Coffee on top of pre-workout was amplifying an already stressed system. 115mg only in Phase 1."},
+    {ph:1,label:"Phase 2",weeks:"Wks 5-8",color:C.yellow,total:"115-229mg",
+     items:[{name:"XS Pre-Workout",mg:115,status:"on",time:"5:00 AM"},{name:"Coffee",mg:100,status:"cut",time:"Still off"},{name:"XS Energy Drink",mg:114,status:"conditional",time:"Training days before noon only"}],
+     goal:"Add energy drink strategically as lifts get heavier.",
+     note:"Only add XS Energy if you genuinely need it on heavy days. Not a daily habit. Before noon only."},
+    {ph:2,label:"Phase 3",weeks:"Wks 9-12",color:C.red,total:"115mg train / 229mg rest",
+     items:[{name:"XS Pre-Workout",mg:115,status:"on",time:"5:00 AM"},{name:"Coffee",mg:100,status:"cut",time:"Still off"},{name:"XS Energy Drink",mg:114,status:"conditional",time:"REST DAYS ONLY before 11am"}],
+     goal:"Energy drink as fat-burning tool on rest days only.",
+     note:"Phase 3 = precision. Rest day XS Energy boosts fat oxidation without spiking training cortisol."},
+  ];
+
+  return(
+    <div style={{background:C.bg,minHeight:"100vh",color:C.text,fontFamily:FB,maxWidth:430,margin:"0 auto",position:"relative",paddingBottom:80}}>
+
+      {/* HEADER */}
+      <div style={{padding:"14px 16px 10px",borderBottom:`1px solid ${C.border}`,background:C.surface}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+          <div>
+            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:2}}>
+              <p style={{margin:0,fontSize:10,color:C.yellow,letterSpacing:"0.3em",fontFamily:FC}}>HUSTLE & HEART</p>
+              <button onClick={onLogout}
+                style={{background:C.surface,border:`1px solid ${C.border}`,borderRadius:6,padding:"2px 8px",cursor:"pointer",fontSize:9,color:C.muted,fontFamily:FC,letterSpacing:"0.08em",textTransform:"uppercase",marginLeft:"auto"}}>
+                SWITCH
+              </button>
+            </div>
+            <h1 style={{margin:"0 0 1px",fontSize:26,fontFamily:FD,letterSpacing:"0.05em",lineHeight:1}}>
+              {user.name.toUpperCase()}'S PROGRAM
+            </h1>
+            <div style={{display:"flex",gap:8,marginTop:2,flexWrap:"wrap"}}>
+              <span style={{fontSize:10,color:pc,fontFamily:FC,letterSpacing:"0.05em"}}>{PHASES[ph].label} · Wk {currentWeek}</span>
+              {deload&&<span style={{fontSize:9,padding:"1px 6px",borderRadius:4,background:C.yellow+"22",color:C.yellow,fontFamily:FC}}>DELOAD</span>}
+              <span style={{fontSize:10,color:C.steel,fontFamily:FC}}>{isTrainingToday?"Training Day":"Rest Day"}</span>
+            </div>
+          </div>
+          <div style={{background:C.card,borderRadius:10,padding:"7px 11px",border:`1px solid ${C.border}`,textAlign:"right"}}>
+            <p style={{margin:0,fontSize:9,color:C.muted,fontFamily:FC}}>BF GOAL</p>
+            <p style={{margin:"2px 0 0",fontSize:20,fontFamily:FD,color:C.yellow,lineHeight:1}}>{curBF.toFixed(1)}%</p>
+            <div style={{width:70,height:3,background:C.border,borderRadius:2,marginTop:3}}>
+              <div style={{width:`${bfProg*100}%`,height:"100%",background:C.yellow,borderRadius:2}}/>
+            </div>
+            <p style={{margin:"2px 0 0",fontSize:9,color:C.muted,fontFamily:FC}}>→ 8.5%</p>
+          </div>
+        </div>
+      </div>
+
+      <div style={{padding:"12px 14px 0"}}>
+
+        {/* ══ WORKOUT TAB ══════════════════════════════════════════════════ */}
+        {tab==="workout"&&(
+          <div>
+            {/* Week + Phase status */}
+            <div style={{background:C.card,borderRadius:10,padding:"10px 14px",marginBottom:10,border:`1px solid ${C.border}`}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:deload?8:0}}>
+                <div>
+                  <p style={{margin:0,fontSize:9,color:C.muted,fontFamily:FC,letterSpacing:"0.15em",textTransform:"uppercase"}}>
+                    {currentWeek===1?"SET BASELINE":deload?"DELOAD WEEK":"PROGRESSIVE OVERLOAD"}
+                  </p>
+                  <p style={{margin:0,fontSize:20,fontFamily:FD,color:pc}}>
+                    {PHASES[ph].label} · WEEK {currentWeek}
+                  </p>
+                </div>
+                <div style={{display:"flex",gap:6,alignItems:"center"}}>
+                  <button onClick={()=>persist({...data,weekOverride:Math.max(1,currentWeek-1)})}
+                    style={{width:32,height:32,borderRadius:8,background:C.surface,border:`1px solid ${C.border}`,color:C.text,fontSize:18,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>-</button>
+                  <span style={{fontSize:16,fontWeight:"bold",fontFamily:FC,color:pc,minWidth:24,textAlign:"center"}}>{currentWeek}</span>
+                  <button onClick={()=>persist({...data,weekOverride:Math.min(12,currentWeek+1)})}
+                    style={{width:32,height:32,borderRadius:8,background:C.surface,border:`1px solid ${C.border}`,color:C.text,fontSize:18,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>+</button>
+                </div>
+              </div>
+              {deload?(
+                <div style={{background:C.yellow+"22",borderRadius:8,padding:"8px 10px",border:`1px solid ${C.yellow}44`}}>
+                  <p style={{margin:0,fontSize:11,color:C.yellow,fontFamily:FB,lineHeight:1.5}}>
+                    DELOAD WEEK - Use 60% of normal weight. Same exercises, same sets. Let your body recover. Deloads are where gains are cemented.
+                  </p>
+                </div>
+              ):(
+                <p style={{margin:0,fontSize:11,color:C.muted,fontFamily:FB,lineHeight:1.4}}>
+                  {currentWeek===1?"Log real weights. Week 2+ targets calculate automatically.":"Targets loaded from Week "+(currentWeek-1)+". Green = hit. Yellow = close. Red = missed."}
+                </p>
+              )}
+            </div>
+
+            {/* Day tabs */}
+            <div style={{display:"flex",gap:6,marginBottom:10}}>
+              {WO[ph].map((d,i)=>(
+                <button key={i} onClick={()=>setDi(i)} style={{flex:1,padding:"9px 4px",borderRadius:6,background:di===i?pc:C.card,color:di===i?"#000":C.muted,border:`1px solid ${di===i?pc:C.border}`,fontSize:11,fontWeight:"bold",cursor:"pointer",fontFamily:FC,textTransform:"uppercase"}}>
+                  {d.day}
+                </button>
+              ))}
+            </div>
+
+            {/* Workout card */}
+            <div style={{background:C.card,borderRadius:12,overflow:"hidden",border:`1px solid ${C.border}`,marginBottom:10}}>
+              <div style={{background:pc,padding:"12px 16px"}}>
+                <p style={{margin:0,fontSize:10,color:"rgba(0,0,0,0.6)",letterSpacing:"0.2em",textTransform:"uppercase",fontFamily:FC}}>{PHASES[ph].sub} - {wo.day}</p>
+                <p style={{margin:"2px 0 2px",fontSize:22,fontFamily:FD,letterSpacing:"0.05em",color:"#000"}}>{wo.label}</p>
+                <p style={{margin:0,fontSize:10,color:"rgba(0,0,0,0.55)",fontFamily:FB}}>{wo.focus}</p>
+              </div>
+              {/* Volume + session note */}
+              {(() => {
+                const sessVol=wo.ex.reduce((sum,ex,i)=>{
+                  const sets=(data[WK(ph,di,i,currentWeek)]||[]).filter(s=>!s.isWarmup);
+                  return sum+calcVolume(sets);
+                },0);
+                const sessNote=data.sessionNotes&&data.sessionNotes[`${ph}_${di}_w${currentWeek}`];
+                if(!sessVol&&!sessNote)return null;
+                return(
+                  <div style={{padding:"8px 14px",background:pc+"11",borderBottom:`1px solid ${C.border}33`}}>
+                    {sessVol>0&&<p style={{margin:0,fontSize:11,color:pc,fontFamily:FC}}>Session volume: {Math.round(sessVol).toLocaleString()} lbs</p>}
+                    {sessNote&&<p style={{margin:"2px 0 0",fontSize:11,color:C.muted,fontFamily:FB,fontStyle:"italic"}}>Note: {sessNote}</p>}
+                  </div>
+                );
+              })()}
+              <div style={{padding:"10px 12px 6px"}}>
+                {wo.ex.map((ex,i)=>{
+                  const done=isDone(i);
+                  const sets=getLast(i);
+                  const hasLog=sets&&sets.some(s=>s.r||s.w);
+                  const targets=getTargets(i);
+                  const tgt=targets&&targets[0];
+                  const wkSets=(data[WK(ph,di,i,currentWeek)]||[]).filter(s=>!s.isWarmup&&!s.isBurnout);
+                  const topSet=wkSets.sort((a,b)=>parseFloat(b.w)-parseFloat(a.w))[0];
+                  const rm=topSet&&topSet.w&&topSet.r?calc1RM(topSet.w,topSet.r):0;
+                  const prevHistory=getHistory(i);
+                  const prevBest=prevHistory.reduce((best,wkS)=>{
+                    const t=(wkS||[]).filter(s=>!s.isWarmup&&!s.isBurnout).sort((a,b)=>parseFloat(b.w)-parseFloat(a.w))[0];
+                    const r=t?calc1RM(t.w,t.r):0;return r>best?r:best;
+                  },0);
+                  const isPR=rm>0&&prevBest>0&&rm>prevBest;
+                  return(
+                    <div key={i} style={{marginBottom:7}}>
+                      <div style={{display:"flex",gap:10,alignItems:"flex-start",padding:"11px 12px",background:done?pc+"18":C.surface,borderRadius:10,border:`1px solid ${done?pc+"44":C.border}`}}>
+                        <div style={{width:22,height:22,borderRadius:4,marginTop:1,flexShrink:0,background:done?pc:"transparent",border:`2px solid ${done?pc:C.dim}`,display:"flex",alignItems:"center",justifyContent:"center"}}>
+                          {done&&<Ic n="check" sz={12} col="#000"/>}
+                        </div>
+                        <div style={{flex:1,minWidth:0}}>
+                          <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
+                            <p style={{margin:0,fontSize:14,fontFamily:FC,fontWeight:700,color:done?C.muted:C.text,textDecoration:done?"line-through":"none"}}>{ex.n}</p>
+                            {ex.inj&&ex.inj!=="none"&&<span style={{fontSize:9,padding:"2px 5px",borderRadius:4,background:C.yellow+"22",color:C.yellow,fontFamily:FC}}>{ex.inj}</span>}
+                            {isPR&&<span style={{fontSize:9,padding:"2px 6px",borderRadius:4,background:C.yellow,color:"#000",fontFamily:FC,fontWeight:700}}>PR!</span>}
+                          </div>
+                          <p style={{margin:"1px 0 0",fontSize:11,color:C.muted,fontFamily:FB}}>{ex.s} sets x {ex.r}{typeof ex.r==="number"?" reps":""}</p>
+                          <p style={{margin:"3px 0 0",fontSize:11,color:C.yellow,fontStyle:"italic",fontFamily:FB,lineHeight:1.4}}>{ex.note}</p>
+                          {currentWeek>1&&tgt&&!done&&(
+                            <div style={{marginTop:5,background:pc+"11",borderRadius:6,padding:"4px 8px",border:`1px solid ${pc}22`}}>
+                              <p style={{margin:0,fontSize:9,color:pc,fontFamily:FC,letterSpacing:"0.1em"}}>
+                                Wk{currentWeek} target: {tgt.w}lb x {tgt.r}{deload?" (DELOAD: "+Math.round(parseFloat(tgt.w)*0.6)+"lb)":""}
+                              </p>
+                            </div>
+                          )}
+                          {rm>0&&(
+                            <p style={{margin:"3px 0 0",fontSize:10,color:isPR?C.yellow:C.steel,fontFamily:FC}}>
+                              est 1RM: {rm}lb{isPR?" NEW PR!":""}
+                            </p>
+                          )}
+                          {hasLog&&(
+                            <div style={{display:"flex",gap:4,flexWrap:"wrap",marginTop:4}}>
+                              {(data[WK(ph,di,i,currentWeek)]||sets||[]).filter(s=>s.r||s.w).map((s,si)=>{
+                                const isB=s.isBurnout;
+                                return(
+                                  <span key={si} style={{fontSize:9,padding:"2px 7px",borderRadius:5,background:isB?C.red+"22":pc+"22",color:isB?C.red:pc,border:`1px solid ${isB?C.red:pc}33`,fontFamily:FC}}>
+                                    {isB?"F:":""}{s.w?`${s.w}lb`:"BW"}x{s.r||"-"}{s.rir!==undefined&&s.rir!==""?" R"+s.rir:""}
+                                  </span>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                        <button onClick={()=>setLm(i)}
+                          style={{flexShrink:0,padding:"5px 10px",borderRadius:8,background:hasLog?pc+"33":C.card,border:`1px solid ${hasLog?pc+"88":C.border}`,color:hasLog?pc:C.muted,fontSize:10,cursor:"pointer",fontFamily:FC,fontWeight:700,whiteSpace:"nowrap"}}>
+                          {hasLog?"EDIT":"LOG"}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+            <button onClick={()=>setTimerOpen(true)}
+              style={{width:"100%",background:C.card,border:`1px solid ${C.border}`,borderRadius:10,padding:"12px",color:C.yellow,fontSize:13,cursor:"pointer",fontFamily:FC,letterSpacing:"0.1em",textTransform:"uppercase",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
+              REST TIMER
+            </button>
+          </div>
+        )}
+
+        {/* ══ FUEL TAB ═════════════════════════════════════════════════════ */}
+        {tab==="meals"&&(
+          <div>
+            <div style={{background:C.card,borderRadius:10,padding:"8px 12px",marginBottom:10,borderLeft:`3px solid ${pc}`}}>
+              <p style={{margin:0,fontSize:11,color:pc,fontFamily:FC}}>
+                Auto-synced to {PHASES[ph].label} — Week {currentWeek}
+              </p>
+            </div>
+            <div style={{display:"flex",background:C.card,borderRadius:8,padding:3,marginBottom:12,border:`1px solid ${C.border}`}}>
+              {["training","rest"].map(d=>(
+                <button key={d} onClick={()=>setMealDt(d)} style={{flex:1,padding:"10px",borderRadius:6,background:mealDt===d?pc:"transparent",color:mealDt===d?"#000":C.muted,border:"none",fontSize:12,fontWeight:"bold",cursor:"pointer",fontFamily:FC,textTransform:"uppercase"}}>
+                  {d==="training"?"Training Day":"Rest Day"}
+                </button>
+              ))}
+            </div>
+            <div style={{background:C.card,borderRadius:12,padding:"12px 16px",marginBottom:12,border:`1px solid ${C.border}`}}>
+              <p style={{margin:"0 0 10px",fontSize:10,color:C.muted,letterSpacing:"0.2em",textTransform:"uppercase",fontFamily:FC}}>
+                Daily Totals - {PHASES[ph].label} - {mealDt==="training"?"Training":"Rest"} Day
+              </p>
+              <div style={{display:"flex",gap:8}}>
+                {[["~"+mp.cal,"kcal",C.yellow],["~"+mp.p+"g","protein",C.green],["~"+mp.c+"g","carbs",C.blue],["~"+mp.f+"g","fat",C.steel]].map(([v,l,col])=>(
+                  <div key={l} style={{flex:1,textAlign:"center",background:C.surface,borderRadius:8,padding:"10px 4px",borderTop:`2px solid ${col}`}}>
+                    <p style={{margin:0,fontSize:13,fontWeight:"bold",fontFamily:FC,color:col}}>{v}</p>
+                    <p style={{margin:0,fontSize:9,color:C.muted,textTransform:"uppercase"}}>{l}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <MealBlock section={mp.bkfst} title="Breakfast" emoji="d" pc={pc}/>
+            <MealBlock section={mp.lunch} title="Lunch" emoji="e" pc={pc}/>
+            <MealBlock section={mp.dinner} title="Dinner" emoji="f" pc={pc}/>
+            <div style={{background:C.card,borderRadius:10,padding:"12px 14px",border:`1px solid ${C.yellow}44`,marginBottom:8}}>
+              <p style={{margin:"0 0 6px",fontSize:11,color:C.yellow,fontFamily:FC,textTransform:"uppercase"}}>Coach Note</p>
+              <p style={{margin:0,fontSize:12,color:C.muted,lineHeight:1.6,fontFamily:FB}}>
+                Current macros: 2,332 kcal - 225g protein. Already in ~400-500 cal deficit. Do not cut further in Phase 1. Fix sleep first - 7 hrs unlocks faster fat loss than any calorie change.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* ══ DAILY TAB ════════════════════════════════════════════════════ */}
+        {tab==="daily"&&(
+          <div>
+            {/* Supplement checklist */}
+            <div style={{background:C.card,borderRadius:12,padding:"14px 16px",marginBottom:12,border:`1px solid ${C.border}`}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+                <div>
+                  <p style={{margin:0,fontSize:18,fontFamily:FD,color:C.green}}>DAILY SUPPS</p>
+                  <p style={{margin:0,fontSize:11,color:C.muted,fontFamily:FB}}>{new Date().toLocaleDateString("en-US",{weekday:"long",month:"short",day:"numeric"})}</p>
+                </div>
+                <div style={{background:C.green+"22",borderRadius:10,padding:"6px 12px",textAlign:"center"}}>
+                  <p style={{margin:0,fontSize:9,color:C.green,fontFamily:FC}}>DONE</p>
+                  <p style={{margin:0,fontSize:18,fontFamily:FD,color:C.green}}>{suppDoneCount}/{todaySupps.length}</p>
+                </div>
+              </div>
+              {/* Progress bar */}
+              <div style={{background:C.border,borderRadius:4,height:6,marginBottom:12}}>
+                <div style={{width:`${todaySupps.length>0?suppDoneCount/todaySupps.length*100:0}%`,height:"100%",background:C.green,borderRadius:4,transition:"width 0.4s"}}/>
+              </div>
+              {/* Morning group */}
+              {["Breakfast","5:00 AM","7:15 AM","Daily"].map(timeGroup=>{
+                const group=todaySupps.filter(s=>s.time===timeGroup);
+                if(!group.length)return null;
+                return(
+                  <div key={timeGroup} style={{marginBottom:12}}>
+                    <p style={{margin:"0 0 6px",fontSize:9,color:C.muted,fontFamily:FC,letterSpacing:"0.15em",textTransform:"uppercase"}}>{timeGroup}</p>
+                    {group.map(s=>{
+                      const done=checkedSupps[s.id];
+                      return(
+                        <button key={s.id} onClick={()=>toggleSupp(s.id)}
+                          style={{width:"100%",display:"flex",alignItems:"center",gap:12,padding:"10px 12px",marginBottom:5,borderRadius:10,background:done?C.green+"18":C.surface,border:`1px solid ${done?C.green+"66":C.border}`,cursor:"pointer",textAlign:"left"}}>
+                          <div style={{width:24,height:24,borderRadius:6,flexShrink:0,background:done?C.green:"transparent",border:`2px solid ${done?C.green:C.dim}`,display:"flex",alignItems:"center",justifyContent:"center"}}>
+                            {done&&<Ic n="check" sz={13} col="#000"/>}
+                          </div>
+                          <div style={{flex:1}}>
+                            <p style={{margin:0,fontSize:12,fontFamily:FC,fontWeight:700,color:done?C.muted:s.cat==="xs"?C.red:C.green,textDecoration:done?"line-through":"none"}}>{s.name}</p>
+                            <p style={{margin:0,fontSize:10,color:C.muted,fontFamily:FB}}>{s.note}</p>
+                          </div>
+                          <span style={{fontSize:9,padding:"2px 7px",borderRadius:4,background:s.cat==="xs"?C.red+"22":C.green+"22",color:s.cat==="xs"?C.red:C.green,fontFamily:FC,flexShrink:0}}>{s.cat.toUpperCase()}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                );
+              })}
+              {/* Evening */}
+              {["Lunch","Dinner","9:30 PM"].map(timeGroup=>{
+                const group=todaySupps.filter(s=>s.time===timeGroup);
+                if(!group.length)return null;
+                return(
+                  <div key={timeGroup} style={{marginBottom:12}}>
+                    <p style={{margin:"0 0 6px",fontSize:9,color:C.muted,fontFamily:FC,letterSpacing:"0.15em",textTransform:"uppercase"}}>{timeGroup}</p>
+                    {group.map(s=>{
+                      const done=checkedSupps[s.id];
+                      return(
+                        <button key={s.id} onClick={()=>toggleSupp(s.id)}
+                          style={{width:"100%",display:"flex",alignItems:"center",gap:12,padding:"10px 12px",marginBottom:5,borderRadius:10,background:done?C.green+"18":C.surface,border:`1px solid ${done?C.green+"66":C.border}`,cursor:"pointer",textAlign:"left"}}>
+                          <div style={{width:24,height:24,borderRadius:6,flexShrink:0,background:done?C.green:"transparent",border:`2px solid ${done?C.green:C.dim}`,display:"flex",alignItems:"center",justifyContent:"center"}}>
+                            {done&&<Ic n="check" sz={13} col="#000"/>}
+                          </div>
+                          <div style={{flex:1}}>
+                            <p style={{margin:0,fontSize:12,fontFamily:FC,fontWeight:700,color:done?C.muted:s.cat==="xs"?C.red:C.green,textDecoration:done?"line-through":"none"}}>{s.name}</p>
+                            <p style={{margin:0,fontSize:10,color:C.muted,fontFamily:FB}}>{s.note}</p>
+                          </div>
+                          <span style={{fontSize:9,padding:"2px 7px",borderRadius:4,background:s.cat==="xs"?C.red+"22":C.green+"22",color:s.cat==="xs"?C.red:C.green,fontFamily:FC,flexShrink:0}}>{s.cat.toUpperCase()}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Caffeine protocol reminder */}
+            <div style={{background:C.card,borderRadius:12,padding:"12px 14px",marginBottom:12,border:`1px solid ${CAFF_PHASES[ph].color}44`}}>
+              <p style={{margin:"0 0 6px",fontSize:14,fontFamily:FD,color:CAFF_PHASES[ph].color}}>CAFFEINE TODAY - {CAFF_PHASES[ph].total}</p>
+              <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                {CAFF_PHASES[ph].items.map((item,i)=>{
+                  const col=item.status==="on"?C.green:item.status==="cut"?C.red:C.yellow;
+                  return(
+                    <div key={i} style={{background:col+"22",borderRadius:8,padding:"6px 10px",border:`1px solid ${col}44`}}>
+                      <p style={{margin:0,fontSize:9,fontFamily:FC,color:col,fontWeight:700,textDecoration:item.status==="cut"?"line-through":"none"}}>{item.name}</p>
+                      <p style={{margin:0,fontSize:9,fontFamily:FB,color:C.muted}}>{item.status==="cut"?"CUT":item.mg+"mg - "+item.time}</p>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Photo prompt */}
+            <div style={{background:C.card,borderRadius:12,padding:"12px 14px",marginBottom:12,border:`1px solid ${C.border}`}}>
+              <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:6}}>
+                <Ic n="camera" sz={18} col={C.steel}/>
+                <p style={{margin:0,fontSize:14,fontFamily:FD,color:C.text,letterSpacing:"0.05em"}}>WEEKLY PROGRESS PHOTO</p>
+              </div>
+              <p style={{margin:"0 0 8px",fontSize:11,color:C.muted,fontFamily:FB,lineHeight:1.5}}>
+                Every Sunday morning. Same time. Same lighting. Same pose. Front, side, and back. These photos will show results the scale misses.
+              </p>
+              <div style={{background:C.surface,borderRadius:8,padding:"8px 12px",border:`1px solid ${C.border}`}}>
+                {[
+                  "Morning, fasted, same time each week",
+                  "Natural lighting near a window",
+                  "Front relaxed + front flexed + side + back",
+                  "Save to a dedicated album for comparison",
+                ].map((t,i)=>(<p key={i} style={{margin:"0 0 4px",fontSize:11,color:C.steel,fontFamily:FB}}><span style={{color:C.green}}>v </span>{t}</p>))}
+              </div>
+            </div>
+
+            {/* Mobility reminder */}
+            <div style={{background:C.card,borderRadius:12,padding:"12px 14px",border:`1px solid ${C.border}`}}>
+              <p style={{margin:"0 0 8px",fontSize:14,fontFamily:FD,color:C.yellow}}>DAILY MOBILITY - 10 MIN</p>
+              {MOB.filter(m=>m.pri==="CRITICAL").map((m,i)=>(
+                <p key={i} style={{margin:"0 0 5px",fontSize:11,color:C.muted,fontFamily:FB}}><span style={{color:C.red}}>! </span><span style={{color:C.text,fontWeight:"bold"}}>{m.title}</span> - {m.time}</p>
+              ))}
+              <p style={{margin:"8px 0 0",fontSize:10,color:C.muted,fontFamily:FB}}>See Rehab tab for full protocol.</p>
+            </div>
+          </div>
+        )}
+
+        {/* ══ TRACK TAB ════════════════════════════════════════════════════ */}
+        {tab==="track"&&(
+          <div>
+            {/* Weight log */}
+            <div style={{background:C.card,borderRadius:12,padding:"14px 16px",marginBottom:12,border:`1px solid ${C.border}`}}>
+              <p style={{margin:"0 0 12px",fontSize:18,fontFamily:FD}}>Daily Weight + Sleep</p>
+              <div style={{display:"flex",gap:8,marginBottom:8}}>
+                <div style={{flex:1}}>
+                  <p style={{margin:"0 0 3px",fontSize:9,color:C.muted,fontFamily:FC,textTransform:"uppercase"}}>Weight (lbs)</p>
+                  <input value={logW} onChange={e=>setLogW(e.target.value)} placeholder="173.5" type="number"
+                    style={{width:"100%",background:C.surface,border:`1px solid ${C.border}`,borderRadius:8,padding:"10px",color:C.text,fontSize:18,fontFamily:FC,outline:"none",textAlign:"center"}}/>
+                </div>
+                <div style={{flex:1}}>
+                  <p style={{margin:"0 0 3px",fontSize:9,color:C.muted,fontFamily:FC,textTransform:"uppercase"}}>Sleep (hrs)</p>
+                  <input value={logSleep} onChange={e=>setLogSleep(e.target.value)} placeholder="6.5" type="number"
+                    style={{width:"100%",background:C.surface,border:`1px solid ${C.border}`,borderRadius:8,padding:"10px",color:C.text,fontSize:18,fontFamily:FC,outline:"none",textAlign:"center"}}/>
+                </div>
+              </div>
+              <input value={logN} onChange={e=>setLogN(e.target.value)} placeholder="Energy, notes, how you feel..."
+                style={{width:"100%",background:C.surface,border:`1px solid ${C.border}`,borderRadius:8,padding:"9px 10px",color:C.text,fontSize:13,fontFamily:FB,outline:"none",boxSizing:"border-box",marginBottom:8}}/>
+              <button onClick={saveWeight} style={{width:"100%",background:C.yellow,color:"#000",border:"none",borderRadius:8,padding:"12px",fontSize:14,fontWeight:"bold",cursor:"pointer",fontFamily:FC,textTransform:"uppercase",letterSpacing:"0.1em"}}>SAVE</button>
+            </div>
+
+            {/* Weight + Sleep chart */}
+            {(data.wlog||[]).length>1&&(()=>{
+              const entries=data.wlog||[];
+              const wVals=entries.map(e=>parseFloat(e.w));
+              const sVals=entries.map(e=>parseFloat(e.sleep)||0);
+              const wMin=Math.min(...wVals)-0.5,wMax=Math.max(...wVals)+0.5;
+              const sMax=Math.max(...sVals,8);
+              const W=340,H=80;
+              const wPts=wVals.map((v,i)=>`${(i/(wVals.length-1))*(W-20)+10},${H-10-((v-wMin)/(wMax-wMin))*(H-20)}`).join(" ");
+              const sPts=sVals.map((v,i)=>`${(i/(sVals.length-1))*(W-20)+10},${H-10-(v/sMax)*(H-20)}`).join(" ");
+              const avgSleep=(sVals.filter(v=>v>0).reduce((s,v)=>s+v,0)/sVals.filter(v=>v>0).length)||0;
+              return(
+                <div style={{background:C.card,borderRadius:12,padding:"14px 16px",marginBottom:12,border:`1px solid ${C.border}`}}>
+                  <div style={{display:"flex",justifyContent:"space-between",marginBottom:8}}>
+                    <p style={{margin:0,fontSize:16,fontFamily:FD}}>Weight + Sleep Trends</p>
+                    <span style={{fontSize:11,color:avgSleep>=7?C.green:avgSleep>=6?C.yellow:C.red,fontFamily:FC}}>
+                      Avg sleep: {avgSleep.toFixed(1)}h
+                    </span>
+                  </div>
+                  <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{display:"block",marginBottom:8}}>
+                    {wVals.length>1&&<polyline points={wPts} stroke={C.yellow} strokeWidth="2" fill="none" strokeLinejoin="round"/>}
+                    {sVals.filter(v=>v>0).length>1&&<polyline points={sPts} stroke={C.blue} strokeWidth="2" fill="none" strokeLinejoin="round" strokeDasharray="4 2"/>}
+                    {wVals.map((v,i)=><circle key={i} cx={(i/(wVals.length-1))*(W-20)+10} cy={H-10-((v-wMin)/(wMax-wMin))*(H-20)} r="3" fill={C.yellow}/>)}
+                  </svg>
+                  <div style={{display:"flex",gap:12,marginBottom:8}}>
+                    <span style={{fontSize:10,color:C.yellow,fontFamily:FC}}>— Weight</span>
+                    <span style={{fontSize:10,color:C.blue,fontFamily:FC}}>-- Sleep</span>
+                    <span style={{fontSize:10,color:logSleep>=7?C.green:C.red,fontFamily:FC}}>
+                      Target: 7h {avgSleep>=7?"ACHIEVED":"in progress"}
+                    </span>
+                  </div>
+                  {entries.slice().reverse().slice(0,5).map((e,i)=>(
+                    <div key={i} style={{display:"flex",justifyContent:"space-between",padding:"5px 0",borderBottom:i<4?`1px solid ${C.border}33`:"none"}}>
+                      <span style={{fontSize:11,color:C.muted,fontFamily:FB}}>{e.date}</span>
+                      <div style={{display:"flex",gap:12}}>
+                        <span style={{fontSize:13,fontWeight:"bold",color:C.yellow,fontFamily:FC}}>{e.w}lbs</span>
+                        {e.sleep&&<span style={{fontSize:12,color:parseFloat(e.sleep)>=7?C.green:parseFloat(e.sleep)>=6?C.yellow:C.red,fontFamily:FC}}>{e.sleep}h</span>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
+
+            {/* Hume scan logger */}
+            <div style={{background:C.card,borderRadius:12,padding:"14px 16px",marginBottom:12,border:`1px solid ${C.border}`}}>
+              <p style={{margin:"0 0 12px",fontSize:18,fontFamily:FD}}>Log Hume Scan</p>
+              <div style={{display:"flex",gap:8,marginBottom:8}}>
+                {[["Weight","173.5",scanW,setScanW],["BF%","11.6",scanBF,setScanBF],["Muscle","97.9",scanM,setScanM]].map(([l,ph2,v,sv])=>(
+                  <div key={l} style={{flex:1}}>
+                    <p style={{margin:"0 0 3px",fontSize:9,color:C.muted,fontFamily:FC,textTransform:"uppercase"}}>{l}</p>
+                    <input value={v} onChange={e=>sv(e.target.value)} placeholder={ph2} type="number"
+                      style={{width:"100%",background:C.surface,border:`1px solid ${C.border}`,borderRadius:8,padding:"9px 8px",color:C.text,fontSize:15,fontFamily:FC,outline:"none",textAlign:"center"}}/>
+                  </div>
+                ))}
+              </div>
+              <input value={scanN} onChange={e=>setScanN(e.target.value)} placeholder="Notes: sleep quality, energy, how you feel..."
+                style={{width:"100%",background:C.surface,border:`1px solid ${C.border}`,borderRadius:8,padding:"9px 10px",color:C.text,fontSize:13,fontFamily:FB,outline:"none",boxSizing:"border-box",marginBottom:8}}/>
+              <button onClick={saveScan} style={{width:"100%",background:C.yellow,color:"#000",border:"none",borderRadius:8,padding:"12px",fontSize:14,fontWeight:"bold",cursor:"pointer",fontFamily:FC,textTransform:"uppercase",letterSpacing:"0.1em"}}>SAVE SCAN</button>
+            </div>
+
+            {/* Body measurements */}
+            <div style={{background:C.card,borderRadius:12,padding:"14px 16px",marginBottom:12,border:`1px solid ${C.border}`}}>
+              <p style={{margin:"0 0 4px",fontSize:18,fontFamily:FD}}>Body Measurements</p>
+              <p style={{margin:"0 0 12px",fontSize:11,color:C.muted,fontFamily:FB}}>Log with a tape measure every 2 weeks. Same time, morning, relaxed.</p>
+              <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:8}}>
+                {[["Waist",mWaist,setMWaist],["Chest",mChest,setMChest],["R Arm",mRArm,setMRArm],["L Arm",mLArm,setMLArm],["Shoulder",mShould,setMShould]].map(([l,v,sv])=>(
+                  <div key={l} style={{flex:"1 1 calc(50% - 8px)",minWidth:80}}>
+                    <p style={{margin:"0 0 3px",fontSize:9,color:C.muted,fontFamily:FC,textTransform:"uppercase"}}>{l} (in)</p>
+                    <input value={v} onChange={e=>sv(e.target.value)} placeholder="0.0" type="number"
+                      style={{width:"100%",background:C.surface,border:`1px solid ${C.border}`,borderRadius:8,padding:"8px",color:C.text,fontSize:16,fontFamily:FC,outline:"none",textAlign:"center"}}/>
+                  </div>
+                ))}
+              </div>
+              <input value={mNote} onChange={e=>setMNote(e.target.value)} placeholder="Notes..."
+                style={{width:"100%",background:C.surface,border:`1px solid ${C.border}`,borderRadius:8,padding:"9px",color:C.text,fontSize:13,fontFamily:FB,outline:"none",boxSizing:"border-box",marginBottom:8}}/>
+              <button onClick={saveMeasurements} style={{width:"100%",background:C.blue,color:"#fff",border:"none",borderRadius:8,padding:"12px",fontSize:14,fontWeight:"bold",cursor:"pointer",fontFamily:FC,textTransform:"uppercase"}}>SAVE MEASUREMENTS</button>
+            </div>
+
+            {/* Measurements history */}
+            {(data.measurements||[]).length>0&&(
+              <div style={{background:C.card,borderRadius:12,padding:"14px 16px",marginBottom:12,border:`1px solid ${C.border}`}}>
+                <p style={{margin:"0 0 12px",fontSize:16,fontFamily:FD}}>Measurement History</p>
+                {(data.measurements||[]).slice().reverse().map((m,i)=>(
+                  <div key={i} style={{padding:"8px 0",borderBottom:i<(data.measurements||[]).length-1?`1px solid ${C.border}33`:"none"}}>
+                    <p style={{margin:"0 0 4px",fontSize:11,color:C.muted,fontFamily:FB}}>{m.date}</p>
+                    <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                      {m.waist&&<span style={{fontSize:11,fontFamily:FC,color:C.text}}>Waist: <span style={{color:C.yellow,fontWeight:"bold"}}>{m.waist}"</span></span>}
+                      {m.chest&&<span style={{fontSize:11,fontFamily:FC,color:C.text}}>Chest: <span style={{color:C.yellow,fontWeight:"bold"}}>{m.chest}"</span></span>}
+                      {m.rarm&&<span style={{fontSize:11,fontFamily:FC,color:C.text}}>R Arm: <span style={{color:C.yellow,fontWeight:"bold"}}>{m.rarm}"</span></span>}
+                      {m.shoulder&&<span style={{fontSize:11,fontFamily:FC,color:C.text}}>Shoulder: <span style={{color:C.yellow,fontWeight:"bold"}}>{m.shoulder}"</span></span>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* PR board */}
+            <div style={{background:C.card,borderRadius:12,padding:"14px 16px",marginBottom:12,border:`1px solid ${C.yellow}44`}}>
+              <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12}}>
+                <Ic n="trophy" sz={18} col={C.yellow}/>
+                <p style={{margin:0,fontSize:18,fontFamily:FD,color:C.yellow}}>PERSONAL RECORDS</p>
+              </div>
+              {WO[ph].map((day,di2)=>
+                day.ex.filter(ex=>isCompound(ex.n)&&!ex.nw).map((ex,ei)=>{
+                  const allWks=Array.from({length:currentWeek},(_,w)=>data[WK(ph,di2,ei,w+1)]||[]);
+                  const best=allWks.reduce((best,sets)=>{
+                    const top=(sets||[]).filter(s=>!s.isWarmup&&!s.isBurnout&&s.w&&s.r).sort((a,b)=>parseFloat(b.w)-parseFloat(a.w))[0];
+                    const rm=top?calc1RM(top.w,top.r):0;
+                    return rm>best.rm?{rm,w:top?.w,r:top?.r}:best;
+                  },{rm:0});
+                  if(!best.rm)return null;
+                  return(
+                    <div key={`${di2}_${ei}`} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"7px 0",borderBottom:`1px solid ${C.border}33`}}>
+                      <span style={{fontSize:12,color:C.text,fontFamily:FC}}>{ex.n}</span>
+                      <div style={{textAlign:"right"}}>
+                        <span style={{fontSize:14,fontWeight:"bold",color:C.yellow,fontFamily:FC}}>{best.rm}lb 1RM</span>
+                        <p style={{margin:0,fontSize:9,color:C.muted,fontFamily:FB}}>{best.w}lb x {best.r}</p>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+              {/* Big 3 targets */}
+              <div style={{marginTop:10,background:C.surface,borderRadius:8,padding:"10px 12px",border:`1px solid ${C.border}`}}>
+                <p style={{margin:"0 0 6px",fontSize:11,color:C.yellow,fontFamily:FC,letterSpacing:"0.1em",textTransform:"uppercase"}}>THE MISSION - BIG 3</p>
+                {[{name:"Bench Press",current:"205lb",target:"225lb+"},{name:"Back Squat",current:"275lb",target:"315lb+"},{name:"Deadlift",current:"375lb",target:"405lb+"}].map((l,i)=>(
+                  <div key={i} style={{display:"flex",justifyContent:"space-between",padding:"5px 0",borderBottom:i<2?`1px solid ${C.border}33`:"none"}}>
+                    <span style={{fontSize:12,fontFamily:FC,color:C.text}}>{l.name}</span>
+                    <span style={{fontSize:12,fontFamily:FC}}><span style={{color:C.steel}}>{l.current}</span><span style={{color:C.muted}}> -> </span><span style={{color:C.yellow}}>{l.target}</span></span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Scan history */}
+            {scans.length>0&&(
+              <div style={{background:C.card,borderRadius:12,padding:"14px 16px",marginBottom:12,border:`1px solid ${C.border}`}}>
+                <p style={{margin:"0 0 12px",fontSize:16,fontFamily:FD}}>Hume Scan History</p>
+                <div style={{background:C.surface,borderRadius:8,padding:"8px 0",border:`1px solid ${C.border}`}}>
+                  <div style={{display:"flex",padding:"4px 12px 8px",borderBottom:`1px solid ${C.border}33`}}>
+                    {["DATE","WEIGHT","BF%","MUSCLE"].map(h=>(<span key={h} style={{flex:1,fontSize:9,color:C.muted,fontFamily:FC,letterSpacing:"0.1em"}}>{h}</span>))}
+                  </div>
+                  {scans.slice().reverse().map((s,i)=>(
+                    <div key={i} style={{display:"flex",padding:"8px 12px",borderBottom:i<scans.length-1?`1px solid ${C.border}22`:"none"}}>
+                      <span style={{flex:1,fontSize:10,color:C.muted,fontFamily:FB}}>{s.date}</span>
+                      <span style={{flex:1,fontSize:12,fontWeight:"bold",color:C.yellow,fontFamily:FC}}>{s.w||"-"}</span>
+                      <span style={{flex:1,fontSize:12,fontWeight:"bold",color:C.red,fontFamily:FC}}>{s.bf||"-"}%</span>
+                      <span style={{flex:1,fontSize:12,fontWeight:"bold",color:C.green,fontFamily:FC}}>{s.m||"-"}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* BF journey */}
+            <div style={{background:C.card,borderRadius:12,padding:"14px 16px",marginBottom:8,border:`1px solid ${C.border}`}}>
+              <p style={{margin:"0 0 12px",fontSize:16,fontFamily:FD}}>BF% Journey</p>
+              {[{l:"Start",v:11.6,c:C.red},{l:"Phase 1 end",v:10.5,c:C.yellow},{l:"Phase 2 end",v:9.5,c:C.yellow},{l:"Summer goal",v:8.5,c:C.green}].map((p,i)=>(
+                <div key={i} style={{display:"flex",alignItems:"center",gap:10,marginBottom:8}}>
+                  <span style={{fontSize:11,color:C.muted,minWidth:90,fontFamily:FC}}>{p.l}</span>
+                  <div style={{flex:1,background:C.border,borderRadius:3,height:6}}>
+                    <div style={{background:p.c,width:`${((p.v-8)/(12-8))*100}%`,height:"100%",borderRadius:3}}/>
+                  </div>
+                  <span style={{fontSize:12,fontWeight:"bold",color:p.c,minWidth:36,textAlign:"right",fontFamily:FC}}>{p.v}%</span>
+                </div>
+              ))}
+              <p style={{margin:"8px 0 0",fontSize:11,color:C.muted,fontFamily:FB}}>Current: <span style={{color:C.yellow,fontWeight:"bold"}}>{curBF.toFixed(1)}%</span> — {(curBF-8.5).toFixed(1)}% to go</p>
+            </div>
+          </div>
+        )}
+
+        {/* ══ REHAB TAB ════════════════════════════════════════════════════ */}
+        {tab==="mobility"&&(
+          <div>
+            <div style={{background:C.card,borderRadius:12,padding:"14px 16px",marginBottom:14,border:`1px solid ${C.yellow}33`}}>
+              <p style={{margin:"0 0 6px",fontSize:18,fontFamily:FD,color:C.yellow}}>THE CHAIN REACTION</p>
+              <p style={{margin:0,fontSize:12,color:C.muted,lineHeight:1.7,fontFamily:FB}}>
+                <span style={{color:C.yellow}}>Tight feet/ankles</span> - restrict hips - anterior pelvic tilt - stress lumbar - limit thoracic - restrict shoulders - stress AC joint. Fix from the ground up. 10 min daily.
+              </p>
+            </div>
+            {MOB.map((m,i)=>(
+              <div key={i} style={{background:C.card,borderRadius:12,padding:"14px 16px",marginBottom:8,border:`1px solid ${C.border}`}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6,flexWrap:"wrap",gap:4}}>
+                  <p style={{margin:0,fontSize:14,fontFamily:FC,fontWeight:700}}>{m.title}</p>
+                  <div style={{display:"flex",gap:6}}>
+                    <span style={{fontSize:9,padding:"2px 7px",borderRadius:4,background:m.pri==="CRITICAL"?C.red+"33":m.pri==="HIGH"?C.yellow+"22":C.border,color:m.pri==="CRITICAL"?C.red:m.pri==="HIGH"?C.yellow:C.muted,fontFamily:FC}}>{m.pri}</span>
+                    <span style={{fontSize:9,padding:"2px 7px",borderRadius:4,background:C.surface,color:C.steel,fontFamily:FC}}>{m.time}</span>
+                  </div>
+                </div>
+                <p style={{margin:0,fontSize:12,color:C.muted,lineHeight:1.6,fontFamily:FB}}>{m.body}</p>
+              </div>
+            ))}
+            <div style={{background:C.card,borderRadius:12,padding:"14px 16px",border:`1px solid ${C.border}`,marginBottom:8}}>
+              <p style={{margin:"0 0 10px",fontSize:14,fontFamily:FC,fontWeight:700,color:C.red}}>NEVER DO (AC Joint)</p>
+              {["Behind-the-neck press or pulldown","Wide-grip upright rows","Max weight barbell flat bench - use DBs","Sleeping on your right shoulder"].map((r,i)=>(
+                <p key={i} style={{margin:"0 0 6px",fontSize:12,color:C.muted,fontFamily:FB}}><span style={{color:C.red}}>X </span>{r}</p>
+              ))}
+            </div>
+          </div>
+        )}
+
+      </div>{/* end padding div */}
+
+      {/* ── BOTTOM NAV ────────────────────────────────────────────────────── */}
+      <div style={{position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",width:"100%",maxWidth:430,background:C.surface,borderTop:`1px solid ${C.border}`,display:"flex",paddingBottom:18}}>
+        {NAV.map(n=>(
+          <button key={n.id} onClick={()=>setTab(n.id)} style={{flex:1,background:"none",border:"none",padding:"11px 4px 2px",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:3}}>
+            <Ic n={n.ic} sz={22} col={tab===n.id?pc:C.dim}/>
+            <span style={{fontSize:8,color:tab===n.id?pc:C.dim,letterSpacing:"0.15em",textTransform:"uppercase",fontFamily:FC}}>{n.lb}</span>
+          </button>
+        ))}
+      </div>
+
+      {/* ── MODALS ────────────────────────────────────────────────────────── */}
+      {lm!==null&&(
+        <LogModal
+          ex={wo.ex[lm]}
+          pc={pc}
+          lastSets={data[`p${ph}_d${di}_e${lm}`]}
+          targets={getTargets(lm)}
+          week={currentWeek}
+          phase={ph}
+          allHistory={getHistory(lm)}
+          onSave={(sets,note)=>saveLog(lm,sets,note)}
+          onClose={()=>setLm(null)}
+        />
+      )}
+      {timerOpen&&<RestTimer onClose={()=>setTimerOpen(false)}/>}
+      {sessionDone&&(
+        <SessionComplete
+          wo={wo} data={data} ph={ph} di={di} week={currentWeek}
+          onClose={()=>setSessionDone(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+function App(){
+  const [activeUser,setActiveUser_] = useState(getActiveUser);
+  const pin = activeUser?.pin;
+  const user = pin ? USERS[pin] : null;
+  const handleLogin = (p) => { setActiveUser(p); setActiveUser_({pin:p,ts:Date.now()}); };
+  const handleLogout = () => { clearActiveUser(); setActiveUser_(null); };
+  if (!user) return <LoginScreen onLogin={handleLogin}/>;
+  return <AppInner pin={pin} user={user} onLogout={handleLogout}/>;
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+  </script>
+
+  <script>
+  // ── SERVICE WORKER + PWA ─────────────────────────────────────────────────
+  const VAPID_PUBLIC_KEY = 'YOUR_VAPID_PUBLIC_KEY';
+  function urlBase64ToUint8Array(b64){
+    const pad='='.repeat((4-b64.length%4)%4);
+    const b=(b64+pad).replace(/-/g,'+').replace(/_/g,'/');
+    const raw=window.atob(b);
+    return Uint8Array.from([...raw].map(c=>c.charCodeAt(0)));
+  }
+  async function registerSW(){
+    if(!('serviceWorker' in navigator))return;
+    try{
+      const reg=await navigator.serviceWorker.register('/sw.js');
+      const perm=await Notification.requestPermission();
+      if(perm!=='granted')return;
+      let sub=await reg.pushManager.getSubscription();
+      if(!sub){sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:urlBase64ToUint8Array(VAPID_PUBLIC_KEY)});}
+      await fetch('/api/subscribe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({subscription:sub})});
+    }catch(e){console.log('SW:',e);}
+  }
+  window.addEventListener('load',registerSW);
+  </script>
+</body>
+</html>

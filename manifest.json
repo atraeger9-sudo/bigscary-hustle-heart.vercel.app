@@ -1,0 +1,21 @@
+{
+  "name": "Big & Scary — Hustle & Heart",
+  "short_name": "Big & Scary",
+  "description": "Your personal shred program. 173.5 lbs to big and scary.",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#080a0f",
+  "theme_color": "#e8c840",
+  "icons": [
+    { "src": "/logo.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" },
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ],
+  "categories": ["health", "fitness", "lifestyle"],
+  "shortcuts": [
+    { "name": "Today's Workout", "url": "/?tab=workout", "description": "Jump to today's training" },
+    { "name": "Fuel", "url": "/?tab=meals", "description": "Today's meal plan" },
+    { "name": "Supplements", "url": "/?tab=supps", "description": "Supplement stack" }
+  ]
+}

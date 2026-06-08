@@ -1,0 +1,12 @@
+{
+  "name": "bigscary-hustle-heart",
+  "version": "2.0.0",
+  "private": true,
+  "description": "Big & Scary fitness PWA — Hustle & Heart",
+  "dependencies": {
+    "web-push": "^3.6.7"
+  },
+  "scripts": {
+    "generate-vapid": "npx web-push generate-vapid-keys"
+  }
+}
