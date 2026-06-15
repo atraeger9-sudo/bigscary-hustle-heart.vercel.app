@@ -1486,6 +1486,8 @@ function AppInner({pin, user, onLogout}){
                 {wo.ex.map((ex,i)=>{
                   const done=isDone(i);
                   const sets=getLast(i);
+                  const thisWeekSets=data[WK(ph,di,i,currentWeek)]||[];
+                  const hasLogThisWeek=thisWeekSets.some(s=>s.r||s.w);
                   const hasLog=sets&&sets.some(s=>s.r||s.w);
                   const targets=getTargets(i);
                   const tgt=targets&&targets[0];
@@ -1538,8 +1540,8 @@ function AppInner({pin, user, onLogout}){
                           )}
                         </div>
                         <button onClick={()=>setLm(i)}
-                          style={{flexShrink:0,padding:"5px 10px",borderRadius:8,background:hasLog?pc+"33":C.card,border:`1px solid ${hasLog?pc+"88":C.border}`,color:hasLog?pc:C.muted,fontSize:10,cursor:"pointer",fontFamily:FC,fontWeight:700,whiteSpace:"nowrap"}}>
-                          {hasLog?"EDIT":"LOG"}
+                          style={{flexShrink:0,padding:"5px 10px",borderRadius:8,background:hasLogThisWeek?pc+"33":C.card,border:`1px solid ${hasLogThisWeek?pc+"88":C.border}`,color:hasLogThisWeek?pc:C.muted,fontSize:10,cursor:"pointer",fontFamily:FC,fontWeight:700,whiteSpace:"nowrap"}}>
+                          {hasLogThisWeek?"EDIT":"LOG"}
                         </button>
                       </div>
                     </div>
