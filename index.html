@@ -1268,6 +1268,22 @@ function AppInner({pin, user, onLogout}){
     setMWaist("");setMChest("");setMRArm("");setMLArm("");setMShould("");setMNote("");
   };
 
+  // Export all locally-stored training data as a JSON file, for migrating
+  // into the new Supabase-backed platform. Purely additive/read-only:
+  // downloads a snapshot, never modifies `data`.
+  const exportData=()=>{
+    const payload={exportedAt:new Date().toISOString(),pin,userName:user.name,data};
+    const blob=new Blob([JSON.stringify(payload,null,2)],{type:"application/json"});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement("a");
+    a.href=url;
+    a.download=`bigscary-export-${user.name.toLowerCase()}-${new Date().toISOString().slice(0,10)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
   const scans=data.scans||[];
   const lastScan=scans[scans.length-1];
   const curBF=lastScan?parseFloat(lastScan.bf):11.6;
@@ -1718,6 +1734,16 @@ function AppInner({pin, user, onLogout}){
         {/* ══ TRACK TAB ════════════════════════════════════════════════════ */}
         {tab==="track"&&(
           <div>
+            {/* Export for migration to the new platform */}
+            <div style={{background:C.card,borderRadius:12,padding:"14px 16px",marginBottom:12,border:`1px solid ${C.yellow}55`}}>
+              <p style={{margin:"0 0 4px",fontSize:16,fontFamily:FD,color:C.yellow}}>Export My Data</p>
+              <p style={{margin:"0 0 10px",fontSize:11,color:C.muted,fontFamily:FB,lineHeight:1.5}}>
+                Download everything you've logged here — lifts, scans, weight, measurements, supplements — as a file
+                you can import into the new app so your history carries over.
+              </p>
+              <button onClick={exportData} style={{width:"100%",background:C.yellow,color:"#000",border:"none",borderRadius:8,padding:"12px",fontSize:14,fontWeight:"bold",cursor:"pointer",fontFamily:FC,textTransform:"uppercase",letterSpacing:"0.1em"}}>DOWNLOAD EXPORT FILE</button>
+            </div>
+
             {/* Weight log */}
             <div style={{background:C.card,borderRadius:12,padding:"14px 16px",marginBottom:12,border:`1px solid ${C.border}`}}>
               <p style={{margin:"0 0 12px",fontSize:18,fontFamily:FD}}>Daily Weight + Sleep</p>
