@@ -508,6 +508,144 @@ const MOB=[
    body:"Foot 3 inches from wall, drive knee to touch. Ankle dorsiflexion = better squat = less patellar stress."},
 ];
 
+// ── MOBILITY DOMAINS (RESET -> RESTORE -> MOBILIZE -> CONTROL) ─────────────
+const MOBILITY_DOMAINS=[
+  {id:"reset",    label:"Reset",    desc:"Downregulate. Breathe. Prepare.",              color:C.blueBright},
+  {id:"restore",  label:"Restore",  desc:"Gentle joint movement. Body awareness.",       color:C.green},
+  {id:"mobilize", label:"Mobilize", desc:"Usable range. Dynamic mobility.",               color:C.greenBright},
+  {id:"control",  label:"Control",  desc:"Own your range. End-range strength.",          color:C.purple},
+];
+
+// ── MOBILITY LIBRARY ────────────────────────────────────────────────────────
+// Each routine is a short sequence of timed steps. "tags" link a routine to
+// assessment priority areas and goals so recommendations are just a filter,
+// not a separate recommendation engine.
+const MOBILITY_LIBRARY=[
+  {id:"reset_breath",domain:"reset",title:"3-Minute Breathing Reset",time:"3 min",tags:["stress","sleep"],
+   body:"Box breathing then a diaphragm scan. Settles the nervous system before or after training.",
+   steps:[{label:"Box breathing",dur:90,note:"4s in, 4s hold, 4s out, 4s hold. Sit or lie down."},
+          {label:"Diaphragm scan",dur:90,note:"Hand on belly — feel it rise before the chest does."}]},
+  {id:"reset_evening",domain:"reset",title:"Evening Downregulation",time:"5 min",tags:["sleep"],
+   body:"Legs-up-the-wall plus slow nasal breathing. Good pre-sleep or post-stress routine.",
+   steps:[{label:"Legs up the wall",dur:120,note:"Hips close to the wall, legs vertical."},
+          {label:"Slow nasal breathing",dur:180,note:"Exhale longer than you inhale."}]},
+  {id:"restore_joints",domain:"restore",title:"Full-Body Joint Prep",time:"4 min",tags:["stiffness","general"],
+   body:"Circles through every major joint. A good first thing in the morning or before any session.",
+   steps:[{label:"Neck circles",dur:30,note:"Slow, both directions."},
+          {label:"Shoulder rolls",dur:30,note:"Big circles, forward then back."},
+          {label:"Hip circles",dur:30,note:"Hands on hips, trace a big circle."},
+          {label:"Ankle circles",dur:30,note:"Each foot, both directions."}]},
+  {id:"restore_catcow",domain:"restore",title:"Cat-Cow Flow",time:"2 min",tags:["back","general"],
+   body:"Classic spinal flexion/extension flow. Use any day your back feels stiff.",
+   steps:[{label:"Cat-Cow",dur:120,note:"On all fours. Round then arch the spine with your breath."}]},
+  {id:"hip_90_90",domain:"mobilize",title:"Hip 90/90 Stretch",time:"2 min/side",pri:"CRITICAL",tags:["hips","squat","front_split"],
+   body:"Both knees at 90°, sit tall, swap sides. Fixes tight hips, unlocks squat depth. Daily.",
+   steps:[{label:"Right side",dur:120,note:"Both knees at 90°. Sit tall."},
+          {label:"Left side",dur:120,note:"Swap sides."}]},
+  {id:"couch_stretch",domain:"mobilize",title:"Couch Stretch",time:"90s/side",pri:"CRITICAL",tags:["hips","front_split"],
+   body:"Rear knee down, front foot forward, drive hips forward. Root fix for tight hip flexors.",
+   steps:[{label:"Right side",dur:90,note:"Rear knee on ground, front foot forward. Drive hips forward, squeeze rear glute."},
+          {label:"Left side",dur:90,note:"Same on the other side."}]},
+  {id:"thoracic_roll",domain:"mobilize",title:"Thoracic Foam Roll",time:"2 min",pri:"HIGH",tags:["shoulders","handstand"],
+   body:"Roll just below the shoulder blades and extend over the roller. Unlocks shoulder mobility.",
+   steps:[{label:"Roll + extend",dur:120,note:"Roll just below shoulder blades, extend over the roller."}]},
+  {id:"shoulder_dislocates",domain:"mobilize",title:"Band Shoulder Dislocates",time:"2x10",pri:"HIGH",tags:["shoulders","handstand"],
+   body:"Wide grip on a band, pass it overhead and behind. Full shoulder mobility.",
+   steps:[{label:"Dislocates",dur:60,note:"Wide grip, pass overhead and behind, slow and controlled."}]},
+  {id:"ankle_wall",domain:"mobilize",title:"Wall Ankle Mobility",time:"2 min each",pri:"MEDIUM",tags:["ankles","squat"],
+   body:"Knee-to-wall drill for ankle dorsiflexion — a common squat-depth limiter.",
+   steps:[{label:"Right ankle",dur:60,note:"Foot 3in from wall, drive knee to touch without the heel lifting."},
+          {label:"Left ankle",dur:60,note:"Same on the other side."}]},
+  {id:"calf_soleus",domain:"mobilize",title:"Calf + Soleus Stretch",time:"90s each",pri:"MEDIUM",tags:["ankles"],
+   body:"Standing calf stretch plus a seated soleus stretch. Tight calves restrict the whole chain below the knee.",
+   steps:[{label:"Standing calf",dur:90,note:"Straight back leg."},
+          {label:"Seated soleus",dur:90,note:"Bent knee, towel stretch."}]},
+  {id:"lacrosse_foot",domain:"mobilize",title:"Lacrosse Ball Foot Roll",time:"2 min/foot",pri:"MEDIUM",tags:["ankles"],
+   body:"Roll under the arch, heel, and ball of the foot. Breaks up the foot-ankle-knee chain.",
+   steps:[{label:"Right foot",dur:60,note:"Roll under arch, heel, ball of foot."},
+          {label:"Left foot",dur:60,note:"Same on the other side."}]},
+  {id:"hamstring_asl",domain:"mobilize",title:"Active Hamstring Flossing",time:"2x8/side",tags:["hamstrings","front_split"],
+   body:"Actively raise and lower a straight leg — builds active range, not just passive flexibility.",
+   steps:[{label:"Right leg",dur:60,note:"Lie on back, raise straight leg actively, lower under control."},
+          {label:"Left leg",dur:60,note:"Same on the other side."}]},
+  {id:"deadbug_control",domain:"control",title:"Dead Bug Control",time:"3x8/side",tags:["core"],
+   body:"Core control foundation. Low back stays glued to the floor the whole time.",
+   steps:[{label:"Dead bug",dur:90,note:"Low back glued to the floor. Breathe out on extension."}]},
+  {id:"end_range_hip",domain:"control",title:"End-Range Hip Lift",time:"3x8/side",tags:["hips","front_split"],
+   body:"From a split-like stretch, actively lift the back leg a few inches. Strength at the edge of your current range.",
+   steps:[{label:"Right side",dur:60,note:"From a split-like stretch position, actively lift the back leg a few inches."},
+          {label:"Left side",dur:60,note:"Same on the other side."}]},
+  {id:"scap_control",domain:"control",title:"Scapular Control",time:"3x8",tags:["shoulders","handstand"],
+   body:"Hang from a bar and pull the shoulder blades down without bending the elbows. Builds the control a handstand needs.",
+   steps:[{label:"Scap pulls",dur:60,note:"Hang from a bar, pull shoulder blades down without bending elbows."}]},
+];
+
+// ── GOALS ────────────────────────────────────────────────────────────────
+// Lightweight personalization: picking a goal just tags which mobility
+// routines and skills get surfaced first. No separate recommendation engine.
+const GOALS=[
+  {id:"build_muscle",   label:"Build Muscle",       tags:["hypertrophy"]},
+  {id:"get_stronger",   label:"Get Stronger",       tags:["strength"]},
+  {id:"move_better",    label:"Move Better",        tags:["general","stiffness"]},
+  {id:"front_split",    label:"Front Split",        tags:["front_split","hips","hamstrings"]},
+  {id:"handstand",      label:"Handstand",          tags:["handstand","shoulders"]},
+  {id:"pistol_squat",   label:"Pistol Squat",       tags:["squat","ankles"]},
+  {id:"hip_mobility",   label:"Hip Mobility",       tags:["hips"]},
+  {id:"shoulder_mobility",label:"Shoulder Mobility",tags:["shoulders"]},
+  {id:"longevity",      label:"Longevity",          tags:["general","stiffness"]},
+];
+
+// ── SKILL TREES ──────────────────────────────────────────────────────────
+// A light version of a skill tree: a manual-advance ladder of levels per
+// skill. No auto-detection of readiness — the user decides when a level is
+// earned, which keeps this honest rather than guessing at their technique.
+const SKILLS=[
+  {id:"handstand",label:"Handstand",tags:["handstand","shoulders"],levels:[
+    {title:"Wrist Preparation",criteria:"Comfortable bearing weight on hands for 60s"},
+    {title:"Wall-Supported (chest to wall)",criteria:"Hold 30s with control"},
+    {title:"Wall-Supported (back to wall)",criteria:"Hold 30s with active shoulders"},
+    {title:"Weight Shifting",criteria:"Shift weight through the hands, 3 sets"},
+    {title:"Kick-Up Practice",criteria:"8 clean kick-up attempts"},
+    {title:"Freestanding Attempts",criteria:"Brief freestanding balance, 10 attempts"},
+    {title:"Freestanding Hold",criteria:"Hold 10s away from the wall"},
+    {title:"Advanced Handstand",criteria:"Press variations or 30s+ holds"},
+  ]},
+  {id:"front_split",label:"Front Split",tags:["front_split","hips","hamstrings"],levels:[
+    {title:"Assess Current Range",criteria:"Measure the gap to the floor on each side"},
+    {title:"Passive Range Building",criteria:"Comfortable supported stretch, gap shrinking"},
+    {title:"Active Range",criteria:"Can actively lift into a shallow split"},
+    {title:"End-Range Control",criteria:"Hold the end position without hands for 10s"},
+    {title:"Near-Full Split",criteria:"Within an inch of the floor, supported"},
+    {title:"Full Split Hold",criteria:"Flat split, hold 10s unsupported"},
+  ]},
+  {id:"pistol_squat",label:"Pistol Squat",tags:["squat","ankles"],levels:[
+    {title:"Assisted Pistol",criteria:"5 reps/side holding a support"},
+    {title:"Box Pistol",criteria:"5 reps/side to a box, full control"},
+    {title:"Full Pistol Squat",criteria:"3 clean reps/side, no support"},
+    {title:"Weighted Pistol",criteria:"Add load, 3 reps/side"},
+  ]},
+  {id:"l_sit",label:"L-Sit",tags:["core","handstand"],levels:[
+    {title:"Tuck Hold",criteria:"Hold a tuck support for 10s"},
+    {title:"One Leg Extended",criteria:"Hold 10s with one leg out"},
+    {title:"Full L-Sit",criteria:"Hold 10s with both legs extended"},
+    {title:"V-Sit Progress",criteria:"Legs rising above parallel, 5s"},
+  ]},
+];
+
+// ── BASELINE ASSESSMENT ─────────────────────────────────────────────────
+const ASSESSMENT_QUESTIONS=[
+  {area:"ankles",label:"Ankles",prompt:"Deep bodyweight squat, heels flat — what happens?",
+   options:[{v:4,l:"Knees track past toes easily"},{v:3,l:"Some restriction, still flat"},{v:2,l:"Heels want to lift"},{v:1,l:"Can't get low with heels down"}]},
+  {area:"hips",label:"Hips",prompt:"Sitting in a 90/90 or cross-legged position, how do your hips feel?",
+   options:[{v:4,l:"Loose, no tension"},{v:3,l:"OK, mild tension"},{v:2,l:"Tight, noticeable restriction"},{v:1,l:"Very restricted / painful"}]},
+  {area:"shoulders",label:"Shoulders",prompt:"Reaching straight overhead, lying on your back — can you get arms vertical?",
+   options:[{v:4,l:"Yes, easily, back stays flat"},{v:3,l:"Mostly, slight arch"},{v:2,l:"Limited, noticeable arch"},{v:1,l:"No, far from vertical"}]},
+  {area:"squat",label:"Squat Depth",prompt:"Deep bodyweight squat — depth and balance?",
+   options:[{v:4,l:"Full depth, comfortable"},{v:3,l:"Full depth, some wobble"},{v:2,l:"Partial depth only"},{v:1,l:"Can't squat deep at all"}]},
+  {area:"balance",label:"Balance",prompt:"Single-leg stand, eyes open — how long and how steady?",
+   options:[{v:4,l:"Easy, 30s both sides"},{v:3,l:"Easy one side, ok the other"},{v:2,l:"Wobbly both sides"},{v:1,l:"Can't hold 10s either side"}]},
+];
+
 // ── ICONS ──────────────────────────────────────────────────────────────────
 const ICON_MAP={
   dumbbell:(sz,col)=>(<svg width={sz} height={sz} viewBox="0 0 24 24" fill="none" stroke={col} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 5v14M18 5v14M6 8h3M15 8h3M6 16h3M15 16h3M9 8v8M15 8v8"/></svg>),
@@ -1169,6 +1307,95 @@ const LoginScreen = ({onLogin}) => {
   );
 };
 
+// ── GOALS PANEL ─────────────────────────────────────────────────────────
+const GoalsPanel=({selected,onToggle,onClose})=>(
+  <div style={{position:"fixed",inset:0,zIndex:300,display:"flex",alignItems:"flex-end",background:"rgba(0,0,0,0.9)"}} onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
+    <div style={{width:"100%",maxWidth:430,margin:"0 auto",background:C.card,borderRadius:"16px 16px 0 0",padding:"24px 20px 40px",maxHeight:"80vh",overflowY:"auto"}}>
+      <p style={{margin:"0 0 4px",fontSize:20,fontFamily:FD,color:C.yellow}}>YOUR GOALS</p>
+      <p style={{margin:"0 0 16px",fontSize:11,color:C.muted,fontFamily:FB}}>Pick what you're training toward. This shapes what gets recommended in Mobility and Skills.</p>
+      <div style={{display:"flex",flexWrap:"wrap",gap:8,marginBottom:20}}>
+        {GOALS.map(g=>{
+          const on=selected.includes(g.id);
+          return(
+            <button key={g.id} onClick={()=>onToggle(g.id)}
+              style={{padding:"10px 14px",borderRadius:20,cursor:"pointer",fontFamily:FC,fontSize:12,fontWeight:700,
+                background:on?C.yellow:C.surface,color:on?"#000":C.steel,border:`1px solid ${on?C.yellow:C.border}`}}>
+              {g.label}
+            </button>
+          );
+        })}
+      </div>
+      <button onClick={onClose} style={{width:"100%",background:C.yellow,color:"#000",border:"none",borderRadius:10,padding:"14px",fontSize:14,fontWeight:"bold",cursor:"pointer",fontFamily:FC,letterSpacing:"0.1em"}}>DONE</button>
+    </div>
+  </div>
+);
+
+// ── BASELINE ASSESSMENT FLOW ───────────────────────────────────────────
+const AssessmentFlow=({onComplete,onClose})=>{
+  const [step,setStep]=useState(0);
+  const [answers,setAnswers]=useState({});
+  const q=ASSESSMENT_QUESTIONS[step];
+  const choose=(v)=>{
+    const next={...answers,[q.area]:v};
+    setAnswers(next);
+    if(step<ASSESSMENT_QUESTIONS.length-1) setStep(step+1);
+    else{
+      const priorities=Object.entries(next).sort((a,b)=>a[1]-b[1]).filter(([,v])=>v<=2).map(([area])=>area);
+      const fallback=Object.entries(next).sort((a,b)=>a[1]-b[1]).slice(0,2).map(([area])=>area);
+      onComplete({completedAt:new Date().toISOString(),answers:next,priorities:priorities.length?priorities:fallback});
+    }
+  };
+  return(
+    <div style={{position:"fixed",inset:0,zIndex:300,display:"flex",alignItems:"flex-end",background:"rgba(0,0,0,0.92)"}} onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
+      <div style={{width:"100%",maxWidth:430,margin:"0 auto",background:C.card,borderRadius:"16px 16px 0 0",padding:"24px 20px 40px"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
+          <p style={{margin:0,fontSize:10,color:C.muted,letterSpacing:"0.2em",fontFamily:FC}}>BASELINE ASSESSMENT · {step+1}/{ASSESSMENT_QUESTIONS.length}</p>
+          <button onClick={onClose} style={{background:"none",border:"none",color:C.muted,fontSize:18,cursor:"pointer"}}>×</button>
+        </div>
+        <p style={{margin:"8px 0 4px",fontSize:22,fontFamily:FD,color:C.yellow}}>{q.label}</p>
+        <p style={{margin:"0 0 18px",fontSize:13,color:C.text,fontFamily:FB,lineHeight:1.5}}>{q.prompt}</p>
+        <div style={{display:"flex",flexDirection:"column",gap:8}}>
+          {q.options.map(o=>(
+            <button key={o.v} onClick={()=>choose(o.v)}
+              style={{textAlign:"left",padding:"14px 16px",borderRadius:10,background:C.surface,border:`1px solid ${C.border}`,color:C.text,fontSize:13,fontFamily:FB,cursor:"pointer"}}>
+              {o.l}
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ── MOBILITY ROUTINE RUNNER ─────────────────────────────────────────────
+const RoutineRunner=({routine,onComplete,onClose})=>{
+  const [stepIdx,setStepIdx]=useState(0);
+  const [timerKey,setTimerKey]=useState(0);
+  const step=routine.steps[stepIdx];
+  const isLast=stepIdx===routine.steps.length-1;
+  const next=()=>{
+    if(isLast) onComplete();
+    else{setStepIdx(stepIdx+1);setTimerKey(timerKey+1);}
+  };
+  return(
+    <div style={{position:"fixed",inset:0,zIndex:300,display:"flex",alignItems:"flex-end",background:"rgba(0,0,0,0.92)"}} onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
+      <div style={{width:"100%",maxWidth:430,margin:"0 auto",background:C.card,borderRadius:"16px 16px 0 0",padding:"24px 20px 40px"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
+          <p style={{margin:0,fontSize:10,color:C.muted,letterSpacing:"0.2em",fontFamily:FC}}>STEP {stepIdx+1}/{routine.steps.length}</p>
+          <button onClick={onClose} style={{background:"none",border:"none",color:C.muted,fontSize:18,cursor:"pointer"}}>×</button>
+        </div>
+        <p style={{margin:"8px 0 2px",fontSize:20,fontFamily:FD,color:C.greenBright}}>{routine.title}</p>
+        <p style={{margin:"0 0 14px",fontSize:15,fontFamily:FC,fontWeight:700,color:C.text}}>{step.label}</p>
+        <p style={{margin:"0 0 14px",fontSize:12,color:C.muted,fontFamily:FB,lineHeight:1.5}}>{step.note}</p>
+        <InlineTimer key={timerKey} seconds={step.dur} label={step.label} onDone={()=>{}}/>
+        <button onClick={next} style={{width:"100%",marginTop:16,background:C.greenBright,color:"#000",border:"none",borderRadius:10,padding:"14px",fontSize:14,fontWeight:"bold",cursor:"pointer",fontFamily:FC,letterSpacing:"0.1em"}}>
+          {isLast?"COMPLETE":"NEXT STEP"}
+        </button>
+      </div>
+    </div>
+  );
+};
+
 function AppInner({pin, user, onLogout}){
   const [data,setData]=useState(()=>load(pin));
   const [tab,setTab]=useState("workout");
@@ -1194,8 +1421,50 @@ function AppInner({pin, user, onLogout}){
   const [mLArm,setMLArm]=useState("");
   const [mShould,setMShould]=useState("");
   const [mNote,setMNote]=useState("");
+  // goals / assessment / skills / mobility runner state
+  const [goalsOpen,setGoalsOpen]=useState(false);
+  const [assessmentOpen,setAssessmentOpen]=useState(false);
+  const [runningRoutine,setRunningRoutine]=useState(null);
+  const [skillLogDraft,setSkillLogDraft]=useState({});
 
   const persist=useCallback(nd=>{setData(nd);save(nd,pin);},[pin]);
+
+  // ── Goals ──────────────────────────────────────────────────────────────
+  const goals=data.goals||[];
+  const goalTags=goals.flatMap(gid=>(GOALS.find(g=>g.id===gid)?.tags)||[]);
+  const toggleGoal=(gid)=>{
+    const next=goals.includes(gid)?goals.filter(g=>g!==gid):[...goals,gid];
+    persist({...data,goals:next});
+  };
+
+  // ── Assessment ─────────────────────────────────────────────────────────
+  const assessment=data.assessment||null;
+  const completeAssessment=(result)=>{persist({...data,assessment:result});setAssessmentOpen(false);};
+
+  // ── Mobility routine log ───────────────────────────────────────────────
+  const mobilityLog=data.mobilityLog||[];
+  const completeRoutine=(routine)=>{
+    persist({...data,mobilityLog:[...mobilityLog,{date:new Date().toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"}),routineId:routine.id,title:routine.title,ts:Date.now()}]});
+    setRunningRoutine(null);
+  };
+
+  // ── Skills ─────────────────────────────────────────────────────────────
+  const skillState=data.skills||{};
+  const getSkill=(sid)=>skillState[sid]||{level:0,log:[]};
+  const advanceSkillLevel=(sid)=>{
+    const s=getSkill(sid);
+    const max=SKILLS.find(sk=>sk.id===sid).levels.length-1;
+    if(s.level>=max)return;
+    persist({...data,skills:{...skillState,[sid]:{...s,level:s.level+1}}});
+  };
+  const logSkillPractice=(sid)=>{
+    const draft=skillLogDraft[sid]||{};
+    if(!draft.hold&&!draft.note)return;
+    const s=getSkill(sid);
+    const entry={date:new Date().toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"}),holdSeconds:draft.hold||"",note:draft.note||"",ts:Date.now()};
+    persist({...data,skills:{...skillState,[sid]:{...s,log:[...(s.log||[]),entry]}}});
+    setSkillLogDraft({...skillLogDraft,[sid]:{hold:"",note:""}});
+  };
 
   // Auto week from start date
   const autoWeek=calcCurrentWeek();
@@ -1289,13 +1558,28 @@ function AppInner({pin, user, onLogout}){
   const curBF=lastScan?parseFloat(lastScan.bf):11.6;
   const bfProg=Math.max(0,Math.min(1,(11.6-curBF)/(11.6-8.5)));
 
+  // Mobility recommendations: union of assessment priority areas + goal tags.
+  // Just a filter over the library, not a separate scoring engine.
+  const priorityTags=assessment?.priorities||[];
+  const recommendTags=[...new Set([...priorityTags,...goalTags])];
+  const recommendedRoutines=recommendTags.length
+    ? MOBILITY_LIBRARY.filter(r=>r.tags.some(t=>recommendTags.includes(t))).slice(0,3)
+    : [];
+  const mobilityByDomain=MOBILITY_DOMAINS.map(d=>({...d,routines:MOBILITY_LIBRARY.filter(r=>r.domain===d.id)}));
+  const sortedSkills=[...SKILLS].sort((a,b)=>{
+    const aMatch=a.tags.some(t=>goalTags.includes(t))?0:1;
+    const bMatch=b.tags.some(t=>goalTags.includes(t))?0:1;
+    return aMatch-bMatch;
+  });
+
   // NAV
   const NAV=[
     {id:"workout",ic:"dumbbell",lb:"Train"},
     {id:"meals",  ic:"meals",   lb:"Fuel"},
     {id:"daily",  ic:"daily",   lb:"Daily"},
     {id:"track",  ic:"track",   lb:"Track"},
-    {id:"mobility",ic:"mobility",lb:"Rehab"},
+    {id:"mobility",ic:"mobility",lb:"Mobility"},
+    {id:"skills", ic:"trophy",  lb:"Skills"},
   ];
 
   // Meal plan - auto-syncs to current phase
@@ -1375,10 +1659,16 @@ function AppInner({pin, user, onLogout}){
           <div>
             <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:2}}>
               <p style={{margin:0,fontSize:10,color:C.yellow,letterSpacing:"0.3em",fontFamily:FC}}>HUSTLE & HEART</p>
-              <button onClick={onLogout}
-                style={{background:C.surface,border:`1px solid ${C.border}`,borderRadius:6,padding:"2px 8px",cursor:"pointer",fontSize:9,color:C.muted,fontFamily:FC,letterSpacing:"0.08em",textTransform:"uppercase",marginLeft:"auto"}}>
-                SWITCH
-              </button>
+              <div style={{display:"flex",gap:6,marginLeft:"auto"}}>
+                <button onClick={()=>setGoalsOpen(true)}
+                  style={{background:C.surface,border:`1px solid ${C.border}`,borderRadius:6,padding:"2px 8px",cursor:"pointer",fontSize:9,color:goals.length?C.yellow:C.muted,fontFamily:FC,letterSpacing:"0.08em",textTransform:"uppercase"}}>
+                  GOALS{goals.length?` (${goals.length})`:""}
+                </button>
+                <button onClick={onLogout}
+                  style={{background:C.surface,border:`1px solid ${C.border}`,borderRadius:6,padding:"2px 8px",cursor:"pointer",fontSize:9,color:C.muted,fontFamily:FC,letterSpacing:"0.08em",textTransform:"uppercase"}}>
+                  SWITCH
+                </button>
+              </div>
             </div>
             <h1 style={{margin:"0 0 1px",fontSize:26,fontFamily:FD,letterSpacing:"0.05em",lineHeight:1}}>
               {user.name.toUpperCase()}'S PROGRAM
@@ -1388,6 +1678,11 @@ function AppInner({pin, user, onLogout}){
               {deload&&<span style={{fontSize:9,padding:"1px 6px",borderRadius:4,background:C.yellow+"22",color:C.yellow,fontFamily:FC}}>DELOAD</span>}
               <span style={{fontSize:10,color:C.steel,fontFamily:FC}}>{isTrainingToday?"Training Day":"Rest Day"}</span>
             </div>
+            {goals.length>0&&(
+              <p style={{margin:"4px 0 0",fontSize:10,color:C.steel,fontFamily:FB}}>
+                Focus: {goals.map(gid=>GOALS.find(g=>g.id===gid)?.label).filter(Boolean).join(" · ")}
+              </p>
+            )}
           </div>
           <div style={{background:C.card,borderRadius:10,padding:"7px 11px",border:`1px solid ${C.border}`,textAlign:"right"}}>
             <p style={{margin:0,fontSize:9,color:C.muted,fontFamily:FC}}>BF GOAL</p>
@@ -1939,30 +2234,150 @@ function AppInner({pin, user, onLogout}){
         {/* ══ REHAB TAB ════════════════════════════════════════════════════ */}
         {tab==="mobility"&&(
           <div>
+            {/* Baseline assessment */}
+            <div style={{background:C.card,borderRadius:12,padding:"14px 16px",marginBottom:14,border:`1px solid ${C.purple}44`}}>
+              {assessment?(
+                <>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+                    <p style={{margin:0,fontSize:16,fontFamily:FD,color:C.purple}}>YOUR PRIORITIES</p>
+                    <button onClick={()=>setAssessmentOpen(true)} style={{background:"none",border:`1px solid ${C.border}`,borderRadius:6,padding:"3px 8px",fontSize:9,color:C.muted,fontFamily:FC,cursor:"pointer"}}>RETAKE</button>
+                  </div>
+                  <p style={{margin:0,fontSize:12,color:C.steel,fontFamily:FB,lineHeight:1.5}}>
+                    Based on your assessment, focus on: {assessment.priorities.map(a=>ASSESSMENT_QUESTIONS.find(q=>q.area===a)?.label).filter(Boolean).join(", ")||"general mobility"}.
+                  </p>
+                </>
+              ):(
+                <>
+                  <p style={{margin:"0 0 6px",fontSize:16,fontFamily:FD,color:C.purple}}>TAKE YOUR BASELINE ASSESSMENT</p>
+                  <p style={{margin:"0 0 10px",fontSize:12,color:C.muted,fontFamily:FB,lineHeight:1.5}}>5 quick questions on ankles, hips, shoulders, squat depth, and balance — surfaces what to prioritize below.</p>
+                  <button onClick={()=>setAssessmentOpen(true)} style={{width:"100%",background:C.purple,color:"#fff",border:"none",borderRadius:8,padding:"11px",fontSize:13,fontWeight:"bold",cursor:"pointer",fontFamily:FC,letterSpacing:"0.08em"}}>START ASSESSMENT</button>
+                </>
+              )}
+            </div>
+
+            {/* Recommended */}
+            {recommendedRoutines.length>0&&(
+              <div style={{marginBottom:14}}>
+                <p style={{margin:"0 0 8px",fontSize:11,color:C.yellow,letterSpacing:"0.15em",textTransform:"uppercase",fontFamily:FC}}>Recommended For You</p>
+                {recommendedRoutines.map(r=>(
+                  <div key={r.id} style={{background:C.card,borderRadius:12,padding:"12px 14px",marginBottom:8,border:`1px solid ${C.yellow}55`,display:"flex",justifyContent:"space-between",alignItems:"center",gap:10}}>
+                    <div>
+                      <p style={{margin:0,fontSize:13,fontFamily:FC,fontWeight:700}}>{r.title}</p>
+                      <p style={{margin:0,fontSize:10,color:C.muted,fontFamily:FB}}>{r.time}</p>
+                    </div>
+                    <button onClick={()=>setRunningRoutine(r)} style={{flexShrink:0,background:C.yellow,color:"#000",border:"none",borderRadius:8,padding:"8px 14px",fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:FC}}>RUN</button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Chain reaction info (kept from original) */}
             <div style={{background:C.card,borderRadius:12,padding:"14px 16px",marginBottom:14,border:`1px solid ${C.yellow}33`}}>
               <p style={{margin:"0 0 6px",fontSize:18,fontFamily:FD,color:C.yellow}}>THE CHAIN REACTION</p>
               <p style={{margin:0,fontSize:12,color:C.muted,lineHeight:1.7,fontFamily:FB}}>
                 <span style={{color:C.yellow}}>Tight feet/ankles</span> - restrict hips - anterior pelvic tilt - stress lumbar - limit thoracic - restrict shoulders - stress AC joint. Fix from the ground up. 10 min daily.
               </p>
             </div>
-            {MOB.map((m,i)=>(
-              <div key={i} style={{background:C.card,borderRadius:12,padding:"14px 16px",marginBottom:8,border:`1px solid ${C.border}`}}>
-                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6,flexWrap:"wrap",gap:4}}>
-                  <p style={{margin:0,fontSize:14,fontFamily:FC,fontWeight:700}}>{m.title}</p>
-                  <div style={{display:"flex",gap:6}}>
-                    <span style={{fontSize:9,padding:"2px 7px",borderRadius:4,background:m.pri==="CRITICAL"?C.red+"33":m.pri==="HIGH"?C.yellow+"22":C.border,color:m.pri==="CRITICAL"?C.red:m.pri==="HIGH"?C.yellow:C.muted,fontFamily:FC}}>{m.pri}</span>
-                    <span style={{fontSize:9,padding:"2px 7px",borderRadius:4,background:C.surface,color:C.steel,fontFamily:FC}}>{m.time}</span>
-                  </div>
+
+            {/* Routine library grouped by domain */}
+            {mobilityByDomain.map(d=>(
+              <div key={d.id} style={{marginBottom:16}}>
+                <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
+                  <span style={{width:8,height:8,borderRadius:"50%",background:d.color}}/>
+                  <p style={{margin:0,fontSize:13,fontFamily:FC,fontWeight:700,color:d.color,textTransform:"uppercase",letterSpacing:"0.1em"}}>{d.label}</p>
+                  <p style={{margin:0,fontSize:10,color:C.muted,fontFamily:FB}}>{d.desc}</p>
                 </div>
-                <p style={{margin:0,fontSize:12,color:C.muted,lineHeight:1.6,fontFamily:FB}}>{m.body}</p>
+                {d.routines.map(r=>(
+                  <div key={r.id} style={{background:C.card,borderRadius:12,padding:"12px 14px",marginBottom:8,border:`1px solid ${C.border}`}}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6,flexWrap:"wrap",gap:4}}>
+                      <p style={{margin:0,fontSize:14,fontFamily:FC,fontWeight:700}}>{r.title}</p>
+                      <div style={{display:"flex",gap:6,alignItems:"center"}}>
+                        {r.pri&&<span style={{fontSize:9,padding:"2px 7px",borderRadius:4,background:r.pri==="CRITICAL"?C.red+"33":r.pri==="HIGH"?C.yellow+"22":C.border,color:r.pri==="CRITICAL"?C.red:r.pri==="HIGH"?C.yellow:C.muted,fontFamily:FC}}>{r.pri}</span>}
+                        <span style={{fontSize:9,padding:"2px 7px",borderRadius:4,background:C.surface,color:C.steel,fontFamily:FC}}>{r.time}</span>
+                      </div>
+                    </div>
+                    <p style={{margin:"0 0 8px",fontSize:12,color:C.muted,lineHeight:1.6,fontFamily:FB}}>{r.body}</p>
+                    <button onClick={()=>setRunningRoutine(r)} style={{background:d.color,color:"#000",border:"none",borderRadius:7,padding:"7px 14px",fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:FC}}>RUN ROUTINE</button>
+                  </div>
+                ))}
               </div>
             ))}
+
+            {/* Recent mobility history */}
+            {mobilityLog.length>0&&(
+              <div style={{background:C.card,borderRadius:12,padding:"14px 16px",border:`1px solid ${C.border}`,marginBottom:8}}>
+                <p style={{margin:"0 0 10px",fontSize:14,fontFamily:FC,fontWeight:700}}>Recent Sessions</p>
+                {mobilityLog.slice().reverse().slice(0,5).map((e,i)=>(
+                  <div key={i} style={{display:"flex",justifyContent:"space-between",padding:"5px 0",borderBottom:i<4?`1px solid ${C.border}33`:"none"}}>
+                    <span style={{fontSize:11,color:C.muted,fontFamily:FB}}>{e.date}</span>
+                    <span style={{fontSize:12,color:C.text,fontFamily:FC}}>{e.title}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
             <div style={{background:C.card,borderRadius:12,padding:"14px 16px",border:`1px solid ${C.border}`,marginBottom:8}}>
               <p style={{margin:"0 0 10px",fontSize:14,fontFamily:FC,fontWeight:700,color:C.red}}>NEVER DO (AC Joint)</p>
               {["Behind-the-neck press or pulldown","Wide-grip upright rows","Max weight barbell flat bench - use DBs","Sleeping on your right shoulder"].map((r,i)=>(
                 <p key={i} style={{margin:"0 0 6px",fontSize:12,color:C.muted,fontFamily:FB}}><span style={{color:C.red}}>X </span>{r}</p>
               ))}
             </div>
+          </div>
+        )}
+
+        {/* ══ SKILLS TAB ═══════════════════════════════════════════════════ */}
+        {tab==="skills"&&(
+          <div>
+            <p style={{margin:"0 0 14px",fontSize:12,color:C.muted,fontFamily:FB,lineHeight:1.5}}>
+              Manual progression — you decide when a level is earned. Log practice sessions as you go.
+            </p>
+            {sortedSkills.map(sk=>{
+              const state=getSkill(sk.id);
+              const maxLevel=sk.levels.length-1;
+              const atMax=state.level>=maxLevel;
+              const current=sk.levels[state.level];
+              const next=sk.levels[state.level+1];
+              const draft=skillLogDraft[sk.id]||{hold:"",note:""};
+              const matchesGoal=sk.tags.some(t=>goalTags.includes(t));
+              return(
+                <div key={sk.id} style={{background:C.card,borderRadius:12,padding:"14px 16px",marginBottom:12,border:`1px solid ${matchesGoal?C.yellow+"55":C.border}`}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
+                    <p style={{margin:0,fontSize:17,fontFamily:FD,color:matchesGoal?C.yellow:C.text}}>{sk.label}</p>
+                    <span style={{fontSize:10,color:C.muted,fontFamily:FC}}>LVL {state.level+1}/{sk.levels.length}</span>
+                  </div>
+                  <div style={{width:"100%",height:4,background:C.border,borderRadius:2,marginBottom:10}}>
+                    <div style={{width:`${((state.level+1)/sk.levels.length)*100}%`,height:"100%",background:matchesGoal?C.yellow:C.steel,borderRadius:2}}/>
+                  </div>
+                  <p style={{margin:0,fontSize:13,fontFamily:FC,fontWeight:700,color:C.text}}>{current.title}</p>
+                  <p style={{margin:"2px 0 10px",fontSize:11,color:C.muted,fontFamily:FB,lineHeight:1.5}}>{current.criteria}</p>
+                  {!atMax&&(
+                    <div style={{background:C.surface,borderRadius:8,padding:"8px 10px",marginBottom:10,border:`1px solid ${C.border}`}}>
+                      <p style={{margin:0,fontSize:10,color:C.steel,fontFamily:FB}}>Next: <span style={{color:C.text}}>{next.title}</span> — {next.criteria}</p>
+                    </div>
+                  )}
+                  <div style={{display:"flex",gap:6,marginBottom:10}}>
+                    <input value={draft.hold} onChange={e=>setSkillLogDraft({...skillLogDraft,[sk.id]:{...draft,hold:e.target.value}})} placeholder="Hold (s)" type="number"
+                      style={{width:70,background:C.surface,border:`1px solid ${C.border}`,borderRadius:7,padding:"8px",color:C.text,fontSize:12,fontFamily:FC,outline:"none",textAlign:"center"}}/>
+                    <input value={draft.note} onChange={e=>setSkillLogDraft({...skillLogDraft,[sk.id]:{...draft,note:e.target.value}})} placeholder="Notes..."
+                      style={{flex:1,background:C.surface,border:`1px solid ${C.border}`,borderRadius:7,padding:"8px 10px",color:C.text,fontSize:12,fontFamily:FB,outline:"none"}}/>
+                    <button onClick={()=>logSkillPractice(sk.id)} style={{background:C.steel,color:"#000",border:"none",borderRadius:7,padding:"8px 12px",fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:FC}}>LOG</button>
+                  </div>
+                  <button onClick={()=>advanceSkillLevel(sk.id)} disabled={atMax}
+                    style={{width:"100%",background:atMax?C.border:C.yellow,color:atMax?C.muted:"#000",border:"none",borderRadius:8,padding:"10px",fontSize:12,fontWeight:700,cursor:atMax?"default":"pointer",fontFamily:FC,letterSpacing:"0.08em"}}>
+                    {atMax?"MAX LEVEL REACHED":"ADVANCE TO NEXT LEVEL"}
+                  </button>
+                  {(state.log||[]).length>0&&(
+                    <div style={{marginTop:10}}>
+                      {state.log.slice().reverse().slice(0,3).map((e,i)=>(
+                        <p key={i} style={{margin:"0 0 4px",fontSize:10,color:C.muted,fontFamily:FB}}>
+                          {e.date}{e.holdSeconds?` · ${e.holdSeconds}s`:""}{e.note?` · ${e.note}`:""}
+                        </p>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
 
@@ -1997,6 +2412,15 @@ function AppInner({pin, user, onLogout}){
         <SessionComplete
           wo={wo} data={data} ph={ph} di={di} week={currentWeek}
           onClose={()=>setSessionDone(false)}
+        />
+      )}
+      {goalsOpen&&<GoalsPanel selected={goals} onToggle={toggleGoal} onClose={()=>setGoalsOpen(false)}/>}
+      {assessmentOpen&&<AssessmentFlow onComplete={completeAssessment} onClose={()=>setAssessmentOpen(false)}/>}
+      {runningRoutine&&(
+        <RoutineRunner
+          routine={runningRoutine}
+          onComplete={()=>completeRoutine(runningRoutine)}
+          onClose={()=>setRunningRoutine(null)}
         />
       )}
     </div>
