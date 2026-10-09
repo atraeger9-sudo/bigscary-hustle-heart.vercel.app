@@ -365,6 +365,72 @@ const WO=[
   ],
 ];
 
+// ── CONDITIONING (VO2max) ───────────────────────────────────────────────────
+// Scheduled on rest days, not lifting days — same-day interference with the
+// heavy compound lifts (and the fatigue cost of stacking both on a day
+// already in a calorie deficit) outweighs the convenience. 2x/week is enough
+// to drive meaningful VO2max gains without competing with the strength/
+// hypertrophy goals for recovery. Low-impact modalities (bike, rower,
+// incline walk/elliptical) are called out explicitly given the knee history
+// — running intervals would load the patellar tendon repeatedly under fatigue.
+// Phase 1 builds an aerobic base before adding real intensity; Phase 2
+// progresses to the Norwegian 4x4 protocol (4x4min @ ~90-95% max HR / 3min
+// active recovery), the most evidence-backed specific VO2max stimulus;
+// Phase 3 holds that same volume steady rather than escalating it, since
+// Phase 3 is already the highest-fatigue, deepest-deficit block.
+const CONDITIONING=[
+  [ // Phase 1 (wk 1-4): aerobic base
+    {id:"aerobic_base",title:"Zone 2 Aerobic Base",focus:"Build an aerobic base before adding real intensity. Low-impact: bike, rower, or incline walk — protects your knees.",
+     warmup:[{n:"Easy spin / walk",r:"5 min",note:"Gradually raise heart rate into Zone 2.",nw:true}],
+     steps:[{label:"Zone 2 steady state",dur:1200,note:"Conversational pace — roughly 60-70% max heart rate. You should be able to speak in full sentences."}],
+     cooldown:"5 min easy pace, then stretch."},
+    {id:"intro_intervals",title:"Introductory Intervals",focus:"Eases into interval work without shocking a system already carrying lifting fatigue. Bike or incline walk preferred over running.",
+     warmup:[{n:"Easy spin / walk + 2 build-ups",r:"6 min",note:"Finish with 2x20s at moderate effort to prime the legs.",nw:true}],
+     steps:[
+       {label:"Interval 1",dur:180,note:"~80-85% max heart rate — hard but controlled."},
+       {label:"Recovery",dur:120,note:"Easy pace, let heart rate come down."},
+       {label:"Interval 2",dur:180,note:"~80-85% max heart rate."},
+       {label:"Recovery",dur:120,note:"Easy pace."},
+       {label:"Interval 3",dur:180,note:"~80-85% max heart rate."},
+       {label:"Recovery",dur:120,note:"Easy pace."},
+     ],cooldown:"5 min easy pace."},
+  ],
+  [ // Phase 2 (wk 5-8): Norwegian 4x4
+    {id:"norwegian_4x4",title:"Norwegian 4x4 Intervals",focus:"The most evidence-backed VO2max protocol. Bike or rower preferred — low-impact and easier on the shoulder than hard running.",
+     warmup:[{n:"Easy spin / walk + 2 build-ups",r:"8 min",note:"Gradually raise heart rate, finish with 2 short pickups.",nw:true}],
+     steps:[
+       {label:"Interval 1",dur:240,note:"~90-95% max heart rate. Hard — you should not be able to speak in full sentences."},
+       {label:"Active recovery",dur:180,note:"~60-70% max heart rate."},
+       {label:"Interval 2",dur:240,note:"~90-95% max heart rate."},
+       {label:"Active recovery",dur:180,note:"~60-70% max heart rate."},
+       {label:"Interval 3",dur:240,note:"~90-95% max heart rate."},
+       {label:"Active recovery",dur:180,note:"~60-70% max heart rate."},
+       {label:"Interval 4",dur:240,note:"~90-95% max heart rate. Last one — empty the tank."},
+     ],cooldown:"5-8 min easy pace."},
+    {id:"aerobic_base",title:"Zone 2 Aerobic Base",focus:"Recovery-friendly aerobic volume between the two hard interval sessions.",
+     warmup:[{n:"Easy spin / walk",r:"5 min",note:"",nw:true}],
+     steps:[{label:"Zone 2 steady state",dur:1500,note:"Conversational pace, roughly 60-70% max heart rate."}],
+     cooldown:"5 min easy pace."},
+  ],
+  [ // Phase 3 (wk 9-12): hold volume steady — this is not the phase to add more stress
+    {id:"norwegian_4x4",title:"Norwegian 4x4 Intervals",focus:"Same protocol as Phase 2, held steady on purpose — you're in a deeper deficit and lifting near-max this phase. This is not the phase to add more stress.",
+     warmup:[{n:"Easy spin / walk + 2 build-ups",r:"8 min",note:"Gradually raise heart rate, finish with 2 short pickups.",nw:true}],
+     steps:[
+       {label:"Interval 1",dur:240,note:"~90-95% max heart rate."},
+       {label:"Active recovery",dur:180,note:"~60-70% max heart rate."},
+       {label:"Interval 2",dur:240,note:"~90-95% max heart rate."},
+       {label:"Active recovery",dur:180,note:"~60-70% max heart rate."},
+       {label:"Interval 3",dur:240,note:"~90-95% max heart rate."},
+       {label:"Active recovery",dur:180,note:"~60-70% max heart rate."},
+       {label:"Interval 4",dur:240,note:"~90-95% max heart rate. If recovery feels compromised this week, cut to 3 rounds rather than pushing through."},
+     ],cooldown:"5-8 min easy pace."},
+    {id:"aerobic_base",title:"Zone 2 Aerobic Base",focus:"Recovery-friendly aerobic volume. Drop this session first if the week is running short on recovery.",
+     warmup:[{n:"Easy spin / walk",r:"5 min",note:"",nw:true}],
+     steps:[{label:"Zone 2 steady state",dur:1500,note:"Conversational pace, roughly 60-70% max heart rate."}],
+     cooldown:"5 min easy pace."},
+  ],
+];
+
 // ── MEAL PLANS ─────────────────────────────────────────────────────────────
 const MEALS=[
   {ph:0,dt:"training",cal:2330,p:225,c:200,f:65,
@@ -598,6 +664,7 @@ const GOALS=[
   {id:"pistol_squat",   label:"Pistol Squat",       tags:["squat","ankles"]},
   {id:"hip_mobility",   label:"Hip Mobility",       tags:["hips"]},
   {id:"shoulder_mobility",label:"Shoulder Mobility",tags:["shoulders"]},
+  {id:"vo2max",         label:"VO2max / Conditioning",tags:["conditioning"]},
   {id:"longevity",      label:"Longevity",          tags:["general","stiffness"]},
 ];
 
@@ -1432,6 +1499,9 @@ function AppInner({pin, user, onLogout}){
   const [assessmentOpen,setAssessmentOpen]=useState(false);
   const [runningRoutine,setRunningRoutine]=useState(null);
   const [skillLogDraft,setSkillLogDraft]=useState({});
+  const [trainMode,setTrainMode]=useState("lift");
+  const [ci,setCi]=useState(0);
+  const [runningConditioning,setRunningConditioning]=useState(null);
 
   const persist=useCallback(nd=>{setData(nd);save(nd,pin);},[pin]);
 
@@ -1452,6 +1522,13 @@ function AppInner({pin, user, onLogout}){
   const completeRoutine=(routine)=>{
     persist({...data,mobilityLog:[...mobilityLog,{date:new Date().toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"}),routineId:routine.id,title:routine.title,ts:Date.now()}]});
     setRunningRoutine(null);
+  };
+
+  // ── Conditioning (VO2max) log ──────────────────────────────────────────
+  const conditioningLog=data.conditioningLog||[];
+  const completeConditioning=(session)=>{
+    persist({...data,conditioningLog:[...conditioningLog,{date:new Date().toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"}),sessionId:session.id,title:session.title,week:currentWeek,ts:Date.now()}]});
+    setRunningConditioning(null);
   };
 
   // ── Skills ─────────────────────────────────────────────────────────────
@@ -1738,6 +1815,17 @@ function AppInner({pin, user, onLogout}){
               )}
             </div>
 
+            {/* Lift / Cardio toggle */}
+            <div style={{display:"flex",background:C.card,borderRadius:8,padding:3,marginBottom:10,border:`1px solid ${C.border}`}}>
+              {[["lift","Lift"],["cardio","Cardio (VO2max)"]].map(([m,l])=>(
+                <button key={m} onClick={()=>setTrainMode(m)} style={{flex:1,padding:"9px",borderRadius:6,background:trainMode===m?pc:"transparent",color:trainMode===m?"#000":C.muted,border:"none",fontSize:12,fontWeight:"bold",cursor:"pointer",fontFamily:FC,textTransform:"uppercase"}}>
+                  {l}
+                </button>
+              ))}
+            </div>
+
+            {trainMode==="lift"&&(<>
+
             {/* Day tabs */}
             <div style={{display:"flex",gap:6,marginBottom:10}}>
               {WO[ph].map((d,i)=>(
@@ -1866,6 +1954,56 @@ function AppInner({pin, user, onLogout}){
                 })}
               </div>
             </div>
+            </>)}
+
+            {trainMode==="cardio"&&(()=>{
+              const sessions=CONDITIONING[ph];
+              const session=sessions[ci]||sessions[0];
+              const thisWeekDone=conditioningLog.filter(c=>c.week===currentWeek);
+              return(
+                <>
+                  <div style={{background:C.blue+"18",border:`1px solid ${C.blue}44`,borderRadius:10,padding:"10px 14px",marginBottom:10}}>
+                    <p style={{margin:0,fontSize:11,color:C.blueBright,fontFamily:FB,lineHeight:1.5}}>
+                      On rest days, not lifting days — stacking hard cardio onto a heavy lifting session works against your strength and muscle goals. {thisWeekDone.length>0?`${thisWeekDone.length} session${thisWeekDone.length>1?"s":""} logged this week.`:"Aim for 2 sessions this week."}
+                    </p>
+                  </div>
+                  <div style={{display:"flex",gap:6,marginBottom:10}}>
+                    {sessions.map((s,i)=>(
+                      <button key={s.id} onClick={()=>setCi(i)} style={{flex:1,padding:"9px 4px",borderRadius:6,background:ci===i?C.blueBright:C.card,color:ci===i?"#000":C.muted,border:`1px solid ${ci===i?C.blueBright:C.border}`,fontSize:11,fontWeight:"bold",cursor:"pointer",fontFamily:FC,textTransform:"uppercase"}}>
+                        {s.title}
+                      </button>
+                    ))}
+                  </div>
+                  <div style={{background:C.card,borderRadius:12,overflow:"hidden",border:`1px solid ${C.border}`,marginBottom:10}}>
+                    <div style={{background:C.blueBright,padding:"12px 16px"}}>
+                      <p style={{margin:0,fontSize:10,color:"rgba(0,0,0,0.6)",letterSpacing:"0.2em",textTransform:"uppercase",fontFamily:FC}}>{PHASES[ph].label} — VO2max</p>
+                      <p style={{margin:"2px 0 2px",fontSize:22,fontFamily:FD,letterSpacing:"0.05em",color:"#000"}}>{session.title}</p>
+                      <p style={{margin:0,fontSize:10,color:"rgba(0,0,0,0.55)",fontFamily:FB}}>{session.focus}</p>
+                    </div>
+                    <div style={{padding:"10px 14px"}}>
+                      <p style={{margin:"0 0 8px",fontSize:10,color:C.greenBright,letterSpacing:"0.15em",textTransform:"uppercase",fontFamily:FC}}>Warm-Up</p>
+                      {session.warmup.map((wu,i)=>(
+                        <p key={i} style={{margin:"0 0 6px",fontSize:12,color:C.text,fontFamily:FB}}>
+                          <span style={{color:C.greenBright,fontFamily:FC}}>{wu.r}</span> — {wu.n} {wu.note&&<span style={{color:C.muted}}>· {wu.note}</span>}
+                        </p>
+                      ))}
+                      <p style={{margin:"10px 0 6px",fontSize:10,color:C.blueBright,letterSpacing:"0.15em",textTransform:"uppercase",fontFamily:FC}}>Main Set</p>
+                      {session.steps.map((st,i)=>(
+                        <p key={i} style={{margin:"0 0 5px",fontSize:12,color:C.text,fontFamily:FB}}>
+                          <span style={{color:C.blueBright,fontFamily:FC}}>{Math.round(st.dur/60)}min</span> {st.label} <span style={{color:C.muted}}>— {st.note}</span>
+                        </p>
+                      ))}
+                      <p style={{margin:"10px 0 0",fontSize:11,color:C.muted,fontFamily:FB,fontStyle:"italic"}}>Cooldown: {session.cooldown}</p>
+                    </div>
+                  </div>
+                  <button onClick={()=>setRunningConditioning(session)}
+                    style={{width:"100%",background:C.blueBright,color:"#000",border:"none",borderRadius:10,padding:"14px",fontSize:14,fontWeight:"bold",cursor:"pointer",fontFamily:FC,letterSpacing:"0.1em",marginBottom:10}}>
+                    START SESSION
+                  </button>
+                </>
+              );
+            })()}
+
             <button onClick={()=>setTimerOpen(true)}
               style={{width:"100%",background:C.card,border:`1px solid ${C.border}`,borderRadius:10,padding:"12px",color:C.yellow,fontSize:13,cursor:"pointer",fontFamily:FC,letterSpacing:"0.1em",textTransform:"uppercase",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
               REST TIMER
@@ -2427,6 +2565,13 @@ function AppInner({pin, user, onLogout}){
           routine={runningRoutine}
           onComplete={()=>completeRoutine(runningRoutine)}
           onClose={()=>setRunningRoutine(null)}
+        />
+      )}
+      {runningConditioning&&(
+        <RoutineRunner
+          routine={runningConditioning}
+          onComplete={()=>completeConditioning(runningConditioning)}
+          onClose={()=>setRunningConditioning(null)}
         />
       )}
     </div>
