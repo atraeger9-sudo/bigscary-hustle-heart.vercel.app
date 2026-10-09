@@ -676,7 +676,7 @@ const RestTimer=({onClose})=>{
   const r=54,ci=2*Math.PI*r,pct=secs/init;
   return(
     <div style={{position:"fixed",inset:0,zIndex:300,display:"flex",alignItems:"flex-end",background:"rgba(0,0,0,0.9)"}} onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
-      <div style={{width:"100%",maxWidth:430,margin:"0 auto",background:C.card,borderRadius:"16px 16px 0 0",padding:"28px 20px 48px",borderBottom:"none",textAlign:"center"}}>
+      <div style={{width:"100%",maxWidth:430,margin:"0 auto",background:C.card,borderRadius:"16px 16px 0 0",padding:"28px 20px calc(48px + env(safe-area-inset-bottom))",borderBottom:"none",textAlign:"center"}}>
         <p style={{margin:"0 0 20px",fontSize:11,color:C.muted,letterSpacing:"0.25em",textTransform:"uppercase",fontFamily:FC}}>REST TIMER</p>
         <svg width="130" height="130" viewBox="0 0 130 130" style={{display:"block",margin:"0 auto 20px"}}>
           <circle cx="65" cy="65" r={r} fill="none" stroke={C.border} strokeWidth="6"/>
@@ -901,7 +901,7 @@ const LogModal=({ex,pc,lastSets,targets,week,phase,allHistory,onSave,onClose})=>
 
   return(
     <div style={{position:"fixed",inset:0,zIndex:200,display:"flex",alignItems:"flex-end",background:"rgba(0,0,0,0.92)"}} onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
-      <div style={{width:"100%",maxWidth:430,margin:"0 auto",background:C.card,borderRadius:"16px 16px 0 0",padding:"20px 16px 40px",borderBottom:"none",maxHeight:"92vh",overflowY:"auto"}}>
+      <div style={{width:"100%",maxWidth:430,margin:"0 auto",background:C.card,borderRadius:"16px 16px 0 0",padding:"20px 16px calc(40px + env(safe-area-inset-bottom))",borderBottom:"none",maxHeight:"92vh",overflowY:"auto"}}>
 
         {/* Header */}
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:12}}>
@@ -1242,7 +1242,7 @@ const LoginScreen = ({onLogin}) => {
   const handleClear = () => { setPin(""); setError(""); };
 
   return (
-    <div style={{background:C.bg,minHeight:"100vh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:24,maxWidth:430,margin:"0 auto"}}>
+    <div style={{background:C.bg,minHeight:"100vh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"24px",paddingTop:"calc(24px + env(safe-area-inset-top))",paddingBottom:"calc(24px + env(safe-area-inset-bottom))",maxWidth:430,margin:"0 auto"}}>
       {/* Logo */}
       <div style={{textAlign:"center",marginBottom:32}}>
         <p style={{margin:"0 0 2px",fontSize:13,color:C.yellow,letterSpacing:"0.4em",fontFamily:FC}}>HUSTLE & HEART</p>
@@ -1310,7 +1310,7 @@ const LoginScreen = ({onLogin}) => {
 // ── GOALS PANEL ─────────────────────────────────────────────────────────
 const GoalsPanel=({selected,onToggle,onClose})=>(
   <div style={{position:"fixed",inset:0,zIndex:300,display:"flex",alignItems:"flex-end",background:"rgba(0,0,0,0.9)"}} onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
-    <div style={{width:"100%",maxWidth:430,margin:"0 auto",background:C.card,borderRadius:"16px 16px 0 0",padding:"24px 20px 40px",maxHeight:"80vh",overflowY:"auto"}}>
+    <div style={{width:"100%",maxWidth:430,margin:"0 auto",background:C.card,borderRadius:"16px 16px 0 0",padding:"24px 20px calc(40px + env(safe-area-inset-bottom))",maxHeight:"80vh",overflowY:"auto"}}>
       <p style={{margin:"0 0 4px",fontSize:20,fontFamily:FD,color:C.yellow}}>YOUR GOALS</p>
       <p style={{margin:"0 0 16px",fontSize:11,color:C.muted,fontFamily:FB}}>Pick what you're training toward. This shapes what gets recommended in Mobility and Skills.</p>
       <div style={{display:"flex",flexWrap:"wrap",gap:8,marginBottom:20}}>
@@ -1347,7 +1347,7 @@ const AssessmentFlow=({onComplete,onClose})=>{
   };
   return(
     <div style={{position:"fixed",inset:0,zIndex:300,display:"flex",alignItems:"flex-end",background:"rgba(0,0,0,0.92)"}} onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
-      <div style={{width:"100%",maxWidth:430,margin:"0 auto",background:C.card,borderRadius:"16px 16px 0 0",padding:"24px 20px 40px"}}>
+      <div style={{width:"100%",maxWidth:430,margin:"0 auto",background:C.card,borderRadius:"16px 16px 0 0",padding:"24px 20px calc(40px + env(safe-area-inset-bottom))"}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
           <p style={{margin:0,fontSize:10,color:C.muted,letterSpacing:"0.2em",fontFamily:FC}}>BASELINE ASSESSMENT · {step+1}/{ASSESSMENT_QUESTIONS.length}</p>
           <button onClick={onClose} style={{background:"none",border:"none",color:C.muted,fontSize:18,cursor:"pointer"}}>×</button>
@@ -1379,7 +1379,7 @@ const RoutineRunner=({routine,onComplete,onClose})=>{
   };
   return(
     <div style={{position:"fixed",inset:0,zIndex:300,display:"flex",alignItems:"flex-end",background:"rgba(0,0,0,0.92)"}} onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
-      <div style={{width:"100%",maxWidth:430,margin:"0 auto",background:C.card,borderRadius:"16px 16px 0 0",padding:"24px 20px 40px"}}>
+      <div style={{width:"100%",maxWidth:430,margin:"0 auto",background:C.card,borderRadius:"16px 16px 0 0",padding:"24px 20px calc(40px + env(safe-area-inset-bottom))"}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
           <p style={{margin:0,fontSize:10,color:C.muted,letterSpacing:"0.2em",fontFamily:FC}}>STEP {stepIdx+1}/{routine.steps.length}</p>
           <button onClick={onClose} style={{background:"none",border:"none",color:C.muted,fontSize:18,cursor:"pointer"}}>×</button>
@@ -1651,10 +1651,10 @@ function AppInner({pin, user, onLogout}){
   ];
 
   return(
-    <div style={{background:C.bg,minHeight:"100vh",color:C.text,fontFamily:FB,maxWidth:430,margin:"0 auto",position:"relative",paddingBottom:80}}>
+    <div style={{background:C.bg,minHeight:"100vh",color:C.text,fontFamily:FB,maxWidth:430,margin:"0 auto",position:"relative",paddingBottom:"calc(80px + env(safe-area-inset-bottom))"}}>
 
       {/* HEADER */}
-      <div style={{padding:"14px 16px 10px",borderBottom:`1px solid ${C.border}`,background:C.surface}}>
+      <div style={{paddingTop:"calc(14px + env(safe-area-inset-top))",paddingLeft:16,paddingRight:16,paddingBottom:10,borderBottom:`1px solid ${C.border}`,background:C.surface}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
           <div>
             <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:2}}>
@@ -2384,7 +2384,7 @@ function AppInner({pin, user, onLogout}){
       </div>{/* end padding div */}
 
       {/* ── BOTTOM NAV ────────────────────────────────────────────────────── */}
-      <div style={{position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",width:"100%",maxWidth:430,background:C.surface,borderTop:`1px solid ${C.border}`,display:"flex",paddingBottom:18}}>
+      <div style={{position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",width:"100%",maxWidth:430,background:C.surface,borderTop:`1px solid ${C.border}`,display:"flex",paddingBottom:"calc(18px + env(safe-area-inset-bottom))"}}>
         {NAV.map(n=>(
           <button key={n.id} onClick={()=>setTab(n.id)} style={{flex:1,background:"none",border:"none",padding:"11px 4px 2px",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:3}}>
             <Ic n={n.ic} sz={22} col={tab===n.id?pc:C.dim}/>
