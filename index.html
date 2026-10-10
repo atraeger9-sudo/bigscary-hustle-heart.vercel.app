@@ -161,6 +161,7 @@ const WO=[
       {n:"Chest-Supported DB Row",s:4,r:12,note:"Trunk muscle LOW. Rows are #1 priority. Go heavy every session.",inj:"none"},
       {n:"DB Floor Press",s:3,r:12,note:"Limits dangerous ROM. Loads chest hard without AC stress.",inj:"shoulder"},
       {n:"Face Pull (cable)",s:4,r:15,note:"Rotator cuff + rear delt health. Every upper session. Never skip.",inj:"shoulder"},
+      {n:"End-Range External Rotation Hold",s:2,r:"20s ea",note:"Arm at 90°, rotate to end-range external rotation and hold with light weight. Face pulls train the mid-range — cuff injury-prevention evidence points specifically to loading the end-range too.",inj:"shoulder"},
       {n:"Incline DB Curl",s:3,r:12,note:"Long head bicep stretch at bottom. Arms that fill a sleeve.",inj:"none"},
       {n:"Cable Tricep Pushdown",s:3,r:15,note:"Lateral head = arm width. Control the eccentric.",inj:"none"},
       {n:"Dead Bug",s:3,r:"8 ea",note:"Core foundation. Low back stays glued. Breathe out on extension.",nw:true,inj:"none"},
@@ -181,8 +182,9 @@ const WO=[
       {n:"Romanian Deadlift",s:4,r:10,note:"Hinge pattern. Minimal knee load. Go heavy.",inj:"knee"},
       {n:"Leg Press (high foot)",s:3,r:15,note:"High placement = less patellar stress. Slow descent.",inj:"knee"},
       {n:"Seated Leg Curl",s:3,r:12,note:"Isolate hamstrings. Controls patellar tendon load.",inj:"knee"},
+      {n:"Nordic Curl (assisted)",s:2,r:"4-6",note:"Eccentric loading at a long muscle length — the best-evidenced exercise in this program for both hamstring flexibility and strain-injury resilience. Directly serves the front split, not just leg day.",inj:"knee"},
+      {n:"Leg Extension (light)",s:2,r:15,note:"Second weekly quad touch — frequency matters as much as volume for growth, and quads only get one direct day otherwise.",inj:"knee"},
       {n:"Calf Raise (standing)",s:3,r:20,note:"Tight calves worsen patella pain. Stretch at bottom.",inj:"foot"},
-      {n:"Pallof Press (cable)",s:3,r:"10 ea",note:"Anti-rotation core. Trunk mass attack.",inj:"none"},
     ],mg:["glutes","hamstrings","quads","calves","core"]},
     {day:"Day C",label:"Upper - Back Width",focus:"Build the V-taper. Upper back thickness. Wide and intimidating.",
     warmup:[
@@ -197,11 +199,12 @@ const WO=[
       {n:"Seated Cable Row (wide)",s:4,r:12,note:"Trunk muscle LOW. Attack every session.",inj:"none"},
       {n:"Landmine Row",s:3,r:"10 ea",note:"Shoulder-safe heavy rowing. One arm, explosive pull.",inj:"shoulder"},
       {n:"DB Lateral Raise",s:4,r:15,note:"Capped delts = big and scary silhouette. Light, strict form.",inj:"shoulder"},
+      {n:"Incline DB Press",s:3,r:12,note:"Second weekly chest touch at a different angle than Day A — frequency matters as much as volume for growth.",inj:"shoulder"},
       {n:"Hammer Curl",s:3,r:12,note:"Brachialis = arm thickness from all angles.",inj:"none"},
       {n:"OH Cable Tricep Ext",s:3,r:12,note:"Long head mass. Elbows tight.",inj:"shoulder"},
       {n:"Ab Wheel Rollout",s:3,r:"8-10",note:"Best core exercise. Hips do not drop.",nw:true,inj:"none"},
       {n:"Couch Stretch",s:1,r:"60s ea",note:"Front-split maintenance dose on your upper day. Mild stretch tension only, never sharp or pinching pain.",nw:true,inj:"hip"},
-    ],mg:["back","shoulders","biceps","triceps","core"]},
+    ],mg:["back","shoulders","chest","biceps","triceps","core"]},
     {day:"Day D",label:"Lower - Quad Focus",focus:"Patella-friendly quads. Hip flexor mobility. Deadlift strength. Front-split progression.",
     warmup:[
       {n:"Hip Flexor Activation",r:"2x10 ea",note:"Lying leg raise + knee drive. Counteracts tight hip flexors before squatting.",nw:true},
@@ -216,6 +219,7 @@ const WO=[
       {n:"Deadlift",s:4,r:6,note:"Progressive overload each week. Own this lift.",inj:"none"},
       {n:"Bulgarian Split Squat",s:3,r:"8 ea",note:"Rear foot elevated reduces knee torque. Slow on descent.",inj:"knee"},
       {n:"Leg Extension (light)",s:3,r:15,note:"Rehab load only. Strengthen quad tendon insertion.",inj:"knee"},
+      {n:"Copenhagen Plank (knee-supported)",s:2,r:"15s ea",note:"Adductor strength at length — well-evidenced for groin/hip health and complements the front-split work on the other lower day.",inj:"hip"},
       {n:"Tibialis Raise",s:3,r:20,note:"Fixes tight calves + foot chain from the ground.",nw:true,inj:"foot"},
       {n:"Plank + Glute Squeeze",s:3,r:"40s",note:"Anterior pelvic tilt fix. Squeeze glutes the whole hold.",nw:true,inj:"none"},
     ],mg:["quads","hamstrings","glutes","core"]},
@@ -234,6 +238,7 @@ const WO=[
       {n:"Incline DB Press",s:4,r:10,note:"Upper chest. DBs allow natural rotation - safer than bar.",inj:"shoulder"},
       {n:"Chest-Supported DB Row",s:5,r:10,note:"Trunk mass LOW. Row heavy every session.",inj:"none"},
       {n:"Face Pull (cable)",s:4,r:15,note:"Shoulder health. Never skip.",inj:"shoulder"},
+      {n:"End-Range External Rotation Hold",s:2,r:"20s ea",note:"Arm at 90°, rotate to end-range external rotation and hold with light weight. Loaded end-range, not just mid-range band work.",inj:"shoulder"},
       {n:"Lateral Raise (cable)",s:4,r:15,note:"Cable keeps tension. Delt caps.",inj:"shoulder"},
       {n:"EZ Bar Curl",s:3,r:10,note:"Sleeve-fillers. Controlled, no swinging.",inj:"none"},
       {n:"Skull Crusher",s:3,r:10,note:"Tricep mass. Elbows locked in.",inj:"none"},
@@ -254,7 +259,8 @@ const WO=[
       {n:"Hip Thrust (barbell)",s:4,r:10,note:"Heavy. Add 5-10 lbs per week.",inj:"knee"},
       {n:"Romanian Deadlift",s:4,r:8,note:"Slow eccentric. Load the hamstrings.",inj:"knee"},
       {n:"Leg Press",s:3,r:15,note:"High foot, controlled descent.",inj:"knee"},
-      {n:"Nordic Curl (assisted)",s:3,r:"4-6",note:"Most effective hamstring exercise.",inj:"knee"},
+      {n:"Nordic Curl (assisted)",s:3,r:"4-6",note:"Eccentric loading at a long muscle length — the best-evidenced exercise in this program for both hamstring flexibility and strain-injury resilience. Directly serves the front split, not just leg day.",inj:"knee"},
+      {n:"Leg Extension (light)",s:2,r:15,note:"Second weekly quad touch — frequency matters as much as volume for growth.",inj:"knee"},
       {n:"Calf + Tibialis Raise",s:3,r:15,note:"Foot and ankle health protocol.",inj:"foot"},
     ],mg:["hamstrings","glutes","quads","calves"]},
     {day:"Day C",label:"Upper - Back Thickness",focus:"Build the trunk. Wide back. Intimidating physique.",
@@ -270,11 +276,12 @@ const WO=[
       {n:"Pendlay Row",s:4,r:8,note:"Explosive pull. Trunk mass. Your weak point - attack it.",inj:"none"},
       {n:"Seated Cable Row (close)",s:4,r:10,note:"Full stretch at front. Squeeze hard at back.",inj:"none"},
       {n:"DB Shoulder Press (neutral)",s:4,r:10,note:"Neutral grip protects AC. Shoulder mass.",inj:"shoulder"},
+      {n:"DB Floor Press",s:3,r:12,note:"Second weekly chest touch at a different angle than Day A — frequency matters as much as volume for growth.",inj:"shoulder"},
       {n:"Rear Delt Fly (cable)",s:4,r:15,note:"Posture and width.",inj:"shoulder"},
       {n:"Incline DB Curl",s:3,r:10,note:"Long head peak.",inj:"none"},
       {n:"Tricep Dip",s:3,r:10,note:"Compound tricep mass.",inj:"shoulder"},
       {n:"Couch Stretch",s:1,r:"60s ea",note:"Front-split maintenance dose on your upper day. Mild stretch tension only, never sharp or pinching pain.",nw:true,inj:"hip"},
-    ],mg:["back","shoulders","biceps","triceps"]},
+    ],mg:["back","shoulders","chest","biceps","triceps"]},
     {day:"Day D",label:"Lower - Squat Strength",focus:"Build the squat. Hip and knee rehab maintained. Front-split progression.",
     warmup:[
       {n:"Banded Squat Walk",r:"2x10 steps ea",note:"Band above knees. Glute med activation for knee tracking.",nw:true},
@@ -286,7 +293,8 @@ const WO=[
     ],ex:[
       {n:"Hip Flexor + Calf Mobility",s:2,r:"90s ea",note:"Always. Patellar tendinitis lives in tight hips.",nw:true,inj:"hip"},
       {n:"Back Squat",s:5,r:5,note:"Progressive overload. Controlled descent.",inj:"knee"},
-      {n:"End-Range Split Hold",s:2,r:"45s ea",note:"Deepest comfortable half-kneeling lunge — lean gently into the stretch and hold. Loaded end-range for the front split. Mild tension only — ease off any sharp or pinching pain immediately.",nw:true,inj:"hip"},
+      {n:"End-Range Split Hold (PAILs/RAILs)",s:2,r:"3x(10s+10s) ea",note:"Deepest comfortable half-kneeling lunge. PAILs: gently contract the stretched muscles against the floor/front leg for 10s. RAILs: release and actively pull 10s deeper using your own muscles, no assistance. Repeat 3x per side. This converts passive range into range you can actually use — stronger stimulus than a plain hold. Mild tension only.",nw:true,inj:"hip"},
+      {n:"Copenhagen Plank (knee-supported)",s:2,r:"15s ea",note:"Adductor strength at length — well-evidenced for groin/hip health, complements the front-split work above.",inj:"hip"},
       {n:"Bulgarian Split Squat (DB)",s:4,r:"8 ea",note:"Slow negative. Single-leg strength.",inj:"knee"},
       {n:"Hip Thrust",s:4,r:10,note:"Heaviest you have done. Glutes are the engine.",inj:"knee"},
       {n:"Leg Extension (moderate)",s:3,r:15,note:"Progress weight slowly.",inj:"knee"},
@@ -309,6 +317,7 @@ const WO=[
       {n:"Weighted Pull-Up",s:5,r:"6-8",note:"Max weight. Building the final physique.",inj:"shoulder"},
       {n:"Chest-Supported Row (heavy)",s:5,r:8,note:"Trunk mass - this is the phase it shows.",inj:"none"},
       {n:"Incline Press + Lat Raise SS",s:4,r:"10/15",note:"Superset. Rest 60s. Chest + delts.",inj:"shoulder"},
+      {n:"End-Range External Rotation Hold",s:2,r:"20s ea",note:"Arm at 90°, rotate to end-range external rotation and hold with light weight. Loaded end-range, not just mid-range band work.",inj:"shoulder"},
       {n:"Curl/Pushdown Superset",s:4,r:"10/12",note:"Back-to-back. Arms fill the sleeves.",inj:"none"},
       {n:"Pallof Press + Ab Wheel SS",s:3,r:"10/8",note:"Core density visible now.",nw:true,inj:"none"},
       {n:"Couch Stretch",s:1,r:"60s ea",note:"Front-split maintenance dose on your upper day. Mild stretch tension only, never sharp or pinching pain.",nw:true,inj:"hip"},
@@ -328,7 +337,8 @@ const WO=[
       {n:"Hip Thrust (max load)",s:5,r:8,note:"Heaviest you have done. Glutes are the engine.",inj:"knee"},
       {n:"Romanian Deadlift",s:4,r:8,note:"Hamstring density. Slow and loaded.",inj:"knee"},
       {n:"Walking Lunge (DBs)",s:3,r:"10 ea",note:"Forward lunge - less patellar stress.",inj:"knee"},
-      {n:"Seated Leg Curl",s:3,r:15,note:"Hamstring hypertrophy, low systemic fatigue. The metabolic finisher moved to your dedicated VO2max days — this phase doesn't need both.",inj:"knee"},
+      {n:"Nordic Curl (assisted)",s:3,r:"4-6",note:"Eccentric loading at a long muscle length — the best-evidenced exercise in this program for both hamstring flexibility and strain-injury resilience. Directly serves the front split, not just leg day.",inj:"knee"},
+      {n:"Leg Extension (light)",s:2,r:15,note:"Second weekly quad touch, low systemic fatigue. The metabolic finisher moved to your dedicated VO2max days — this phase doesn't need both.",inj:"knee"},
       {n:"Tibialis + Calf Protocol",s:3,r:20,note:"End every lower session with this.",inj:"foot"},
     ],mg:["hamstrings","glutes","quads","calves"]},
     {day:"Day C",label:"Upper - Width & Detail",focus:"Wide back. Capped delts. Visible separation.",
@@ -344,11 +354,12 @@ const WO=[
       {n:"Pendlay Row (heavy)",s:5,r:6,note:"Explosive. Trunk thickness. Attack it.",inj:"none"},
       {n:"Cable Row (long pull)",s:4,r:10,note:"Full stretch, drive elbows hard.",inj:"none"},
       {n:"Lateral Raise 21s",s:4,r:"7+7+7",note:"7 bottom, 7 top, 7 full. Deltoid burn.",inj:"shoulder"},
+      {n:"DB Floor Press",s:3,r:12,note:"Second weekly chest touch at a different angle than Day A — frequency matters as much as volume for growth.",inj:"shoulder"},
       {n:"Rear Delt + Face Pull SS",s:4,r:"12+15",note:"Superset. Back of a scary physique.",inj:"shoulder"},
       {n:"Arm Finisher SS",s:3,r:"10 ea",note:"Curl + pushdown superset. Maximum pump.",inj:"none"},
       {n:"Dead Bug + Pallof SS",s:3,r:"8+10",note:"Final phase core density.",nw:true,inj:"none"},
       {n:"Couch Stretch",s:1,r:"60s ea",note:"Front-split maintenance dose on your upper day. Mild stretch tension only, never sharp or pinching pain.",nw:true,inj:"hip"},
-    ],mg:["back","shoulders","biceps","triceps","core"]},
+    ],mg:["back","shoulders","chest","biceps","triceps","core"]},
     {day:"Day D",label:"Lower - Final Shred",focus:"Heavy squat. Look like you lift. Front-split progression.",
     warmup:[
       {n:"Banded Squat Walk",r:"2x15 steps ea",note:"More activation in Phase 3. Glute med firing hard.",nw:true},
@@ -360,7 +371,8 @@ const WO=[
     ],ex:[
       {n:"Mobility + Activation",s:1,r:"5 min",note:"Hip flexors, quads, calves. Do not skip.",nw:true,inj:"hip"},
       {n:"Back Squat (heavy)",s:5,r:5,note:"Final phase. Push the numbers. You have earned it.",inj:"knee"},
-      {n:"Couch Stretch - Front Foot Elevated",s:2,r:"60s ea",note:"Deeper hip extension than the standard couch stretch. 8 weeks of work behind this one — feel the difference. Mild stretch tension only, never sharp or pinching pain.",nw:true,inj:"hip"},
+      {n:"Couch Stretch - Front Foot Elevated (PAILs/RAILs)",s:2,r:"3x(10s+10s) ea",note:"Deeper hip extension than the standard couch stretch. PAILs: gently contract the hip flexor into the stretch for 10s. RAILs: release and actively drive the hip deeper for 10s, no assistance. Repeat 3x per side. 8 weeks of work behind this — this is the most advanced version of it. Mild tension only.",nw:true,inj:"hip"},
+      {n:"Copenhagen Plank (knee-supported)",s:2,r:"20s ea",note:"Adductor strength at length — well-evidenced for groin/hip health, complements the front-split work above.",inj:"hip"},
       {n:"Hip Thrust + RDL SS",s:4,r:"10+8",note:"Posterior chain superset. 90s between pairs.",inj:"knee"},
       {n:"Bulgarian Split Squat",s:4,r:"8 ea",note:"Final phase - add weight.",inj:"knee"},
       {n:"Leg Press (drop set)",s:4,r:12,note:"Last set = drop set. Strip weight, go again.",inj:"knee"},
@@ -2002,6 +2014,29 @@ const RoutineRunner=({routine,onComplete,onClose})=>{
   );
 };
 
+// ── CONDITIONING EFFORT CHECK ───────────────────────────────────────────
+// The only honest way to know VO2max is improving without lab equipment:
+// the same protocol should start feeling easier at the same RPE over time.
+// Logged every session so the deload-week checkpoint has a trend to show,
+// not just a single data point.
+const ConditioningRPEModal=({onSubmit,onClose})=>(
+  <div style={{position:"fixed",inset:0,zIndex:300,display:"flex",alignItems:"flex-end",background:"rgba(0,0,0,0.92)"}} onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
+    <div style={{width:"100%",maxWidth:430,margin:"0 auto",background:C.card,borderRadius:"16px 16px 0 0",padding:"24px 20px calc(40px + env(safe-area-inset-bottom))",textAlign:"center"}}>
+      <p style={{margin:"0 0 4px",fontSize:20,fontFamily:FD,color:C.blueBright}}>HOW HARD WAS THAT?</p>
+      <p style={{margin:"0 0 18px",fontSize:12,color:C.muted,fontFamily:FB,lineHeight:1.5}}>Rate the session overall, 1 (easy) to 10 (max effort). This is how we'll know the training is working — the same protocol should feel easier over time.</p>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:8,marginBottom:12}}>
+        {[1,2,3,4,5,6,7,8,9,10].map(v=>(
+          <button key={v} onClick={()=>onSubmit(v)}
+            style={{padding:"14px 0",borderRadius:8,background:C.surface,border:`1px solid ${C.border}`,color:C.text,fontSize:15,fontWeight:700,fontFamily:FC,cursor:"pointer"}}>
+            {v}
+          </button>
+        ))}
+      </div>
+      <button onClick={onClose} style={{background:"none",border:"none",color:C.muted,fontSize:12,fontFamily:FB,cursor:"pointer"}}>Skip</button>
+    </div>
+  </div>
+);
+
 function AppInner({pin, user, onLogout}){
   const [data,setData]=useState(()=>load(pin));
   const [tab,setTab]=useState("workout");
@@ -2035,6 +2070,7 @@ function AppInner({pin, user, onLogout}){
   const [trainMode,setTrainMode]=useState("lift");
   const [ci,setCi]=useState(0);
   const [runningConditioning,setRunningConditioning]=useState(null);
+  const [pendingConditioningRPE,setPendingConditioningRPE]=useState(null);
 
   const persist=useCallback(nd=>{setData(nd);save(nd,pin);},[pin]);
 
@@ -2060,9 +2096,20 @@ function AppInner({pin, user, onLogout}){
   // ── Conditioning (VO2max) log ──────────────────────────────────────────
   const conditioningLog=data.conditioningLog||[];
   const completeConditioning=(session)=>{
-    persist({...data,conditioningLog:[...conditioningLog,{date:new Date().toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"}),sessionId:session.id,title:session.title,week:currentWeek,ts:Date.now()}]});
     setRunningConditioning(null);
+    setPendingConditioningRPE(session);
   };
+  const logConditioningRPE=(rpe)=>{
+    const session=pendingConditioningRPE;
+    persist({...data,conditioningLog:[...conditioningLog,{date:new Date().toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"}),sessionId:session.id,title:session.title,week:currentWeek,rpe,ts:Date.now()}]});
+    setPendingConditioningRPE(null);
+  };
+  // Trend of logged effort for the Norwegian 4x4 specifically -- the
+  // deload-week checkpoint for "is VO2max actually improving" is simpler
+  // than a lab test: the same protocol should start feeling easier at the
+  // same RPE, or the same RPE should correspond to more rounds completed.
+  const norwegian4x4History=conditioningLog.filter(c=>c.sessionId==="norwegian_4x4"&&c.rpe!=null);
+  const lastConditioningRPE=norwegian4x4History[norwegian4x4History.length-1];
 
   // ── Skills ─────────────────────────────────────────────────────────────
   const skillState=data.skills||{};
@@ -2356,6 +2403,11 @@ function AppInner({pin, user, onLogout}){
                   Deload weeks are the natural checkpoint. Measure your front-split floor-to-hip gap and log it under the Front Split skill — it's the only way to know the mobility work is actually working, not just that you're doing it.
                 </p>
                 <button onClick={()=>setTab("skills")} style={{marginTop:8,background:C.purple,color:"#fff",border:"none",borderRadius:7,padding:"7px 12px",fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:FC}}>GO TO SKILLS</button>
+                <p style={{margin:"12px 0 0",fontSize:11,color:C.steel,fontFamily:FB,lineHeight:1.5}}>
+                  {norwegian4x4History.length>0
+                    ?`VO2max check: your last Norwegian 4x4 was RPE ${lastConditioningRPE.rpe}/10 (${lastConditioningRPE.date}). ${norwegian4x4History.length>1?"Same protocol feeling easier at the same RPE is the real signal it's working.":"Keep logging effort each session to start seeing the trend."}`
+                    :"VO2max check: no Norwegian 4x4 effort ratings logged yet — rate each session when you finish it and this will track whether the same protocol is getting easier."}
+                </p>
               </div>
             )}
 
@@ -2518,7 +2570,17 @@ function AppInner({pin, user, onLogout}){
 
             {trainMode==="cardio"&&(()=>{
               const sessions=CONDITIONING[ph];
-              const session=sessions[ci]||sessions[0];
+              const rawSession=sessions[ci]||sessions[0];
+              // On deload weeks, cut interval sessions from 4 rounds to 3 --
+              // the deload is supposed to be a true systemic recovery week,
+              // not just lighter lifting while conditioning stays full-send.
+              const intervalCount=rawSession.steps.filter(s=>/^Interval \d/.test(s.label)).length;
+              const isIntervalSession=intervalCount>=4;
+              const session=(deload&&isIntervalSession)?{
+                ...rawSession,
+                title:rawSession.title+" (Deload — 3 rounds)",
+                steps:rawSession.steps.slice(0,-2),
+              }:rawSession;
               const thisWeekDone=conditioningLog.filter(c=>c.week===currentWeek);
               return(
                 <>
@@ -2527,6 +2589,13 @@ function AppInner({pin, user, onLogout}){
                       On rest days, not lifting days — stacking hard cardio onto a heavy lifting session works against your strength and muscle goals. {thisWeekDone.length>0?`${thisWeekDone.length} session${thisWeekDone.length>1?"s":""} logged this week.`:"Aim for 2 sessions this week."}
                     </p>
                   </div>
+                  {deload&&isIntervalSession&&(
+                    <div style={{background:C.purple+"18",border:`1px solid ${C.purple}55`,borderRadius:10,padding:"10px 14px",marginBottom:10}}>
+                      <p style={{margin:0,fontSize:11,color:C.purple,fontFamily:FB,lineHeight:1.5}}>
+                        Deload week — this interval session is trimmed to 3 rounds instead of 4. The deload only works if conditioning backs off too, not just the lifting.
+                      </p>
+                    </div>
+                  )}
                   <div style={{display:"flex",gap:6,marginBottom:10}}>
                     {sessions.map((s,i)=>(
                       <button key={s.id} onClick={()=>setCi(i)} style={{flex:1,padding:"9px 4px",borderRadius:6,background:ci===i?C.blueBright:C.card,color:ci===i?"#000":C.muted,border:`1px solid ${ci===i?C.blueBright:C.border}`,fontSize:11,fontWeight:"bold",cursor:"pointer",fontFamily:FC,textTransform:"uppercase"}}>
@@ -3132,6 +3201,12 @@ function AppInner({pin, user, onLogout}){
           routine={runningConditioning}
           onComplete={()=>completeConditioning(runningConditioning)}
           onClose={()=>setRunningConditioning(null)}
+        />
+      )}
+      {pendingConditioningRPE&&(
+        <ConditioningRPEModal
+          onSubmit={rpe=>logConditioningRPE(rpe)}
+          onClose={()=>logConditioningRPE(null)}
         />
       )}
     </div>
