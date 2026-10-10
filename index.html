@@ -9,21 +9,23 @@
   <title>Big &amp; Scary — Hustle &amp; Heart</title>
   <link rel="manifest" href="/manifest.json"/>
   <link rel="apple-touch-icon" href="/logo.svg"/>
-  <meta name="theme-color" content="#e8c840"/>
+  <meta name="theme-color" content="#12141A"/>
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
-  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow+Condensed:wght@400;600;700&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Barlow+Condensed:wght@400;600;700&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet"/>
   <style>
     *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-    html,body,#root{height:100%;width:100%;background:#080a0f}
+    html,body,#root{height:100%;width:100%;background:#12141A}
     body{-webkit-font-smoothing:antialiased;overscroll-behavior:none}
     input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
     input[type=number]{-moz-appearance:textfield}
     ::-webkit-scrollbar{display:none}
     *{-webkit-tap-highlight-color:transparent}
+    button{transition:opacity 0.15s ease,transform 0.1s ease}
+    button:active{transform:scale(0.97);opacity:0.85}
   </style>
 </head>
 <body>
-  <div id="root"><div style="color:#e8c840;font-family:Georgia,serif;text-align:center;padding:40px;font-size:16px">Loading Big &amp; Scary...</div></div>
+  <div id="root"><div style="color:#D4A857;font-family:Georgia,serif;text-align:center;padding:40px;font-size:16px">Loading Big &amp; Scary...</div></div>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
   <script></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
@@ -33,12 +35,16 @@
 const {useState,useEffect,useRef,useCallback,useMemo} = React;
 
 // ── THEME ──────────────────────────────────────────────────────────────────
-const C={bg:"#080a0f",surface:"#0f1218",card:"#141920",border:"#1e2530",
-  yellow:"#e8c840",yellowDim:"#a08a20",red:"#d43030",redDim:"#8a1a1a",
-  blue:"#2a6aad",blueBright:"#4a8fd4",steel:"#8a9bb0",muted:"#4a5568",
-  text:"#e8eaf0",dim:"#2a3344",green:"#2a8a4a",greenBright:"#3ab860",
-  purple:"#7c4daa",orange:"#d4782a"};
-const FD="'Bebas Neue',sans-serif";
+// "Studio" palette — dark charcoal-navy (not pure black), soft elevation over
+// hard borders, one muted amber accent plus a sage/teal secondary instead of
+// one loud saturated color. Every reference below is by name (C.yellow,
+// C.card, etc.) so swapping hex values here restyles the whole app.
+const C={bg:"#12141A",surface:"#171A21",card:"#1A1D24",border:"#262A33",
+  yellow:"#D4A857",yellowDim:"#8A6E3A",red:"#C85C50",redDim:"#6B332C",
+  blue:"#4A7FBF",blueBright:"#6FA8DC",steel:"#8891A1",muted:"#5E6473",
+  text:"#E7E9EE",dim:"#2A2E38",green:"#5F9C8C",greenBright:"#6FAFA0",
+  purple:"#9C7FB5",orange:"#C98A4B"};
+const FD="'Space Grotesk',sans-serif";
 const FC="'Barlow Condensed',sans-serif";
 const FB="'Barlow',sans-serif";
 
@@ -1371,7 +1377,7 @@ const RIRSelect=({value,onChange})=>(
 const MealBlock=({section,title,emoji,pc})=>{
   const [open,setOpen]=useState(true);
   return(
-    <div style={{background:C.card,borderRadius:12,border:`1px solid ${C.border}`,marginBottom:10,overflow:"hidden"}}>
+    <div style={{background:C.card,borderRadius:16,border:`1px solid ${C.border}`,marginBottom:10,overflow:"hidden"}}>
       <button onClick={()=>setOpen(!open)} style={{width:"100%",background:"none",border:"none",cursor:"pointer",padding:"12px 16px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
         <div style={{display:"flex",alignItems:"center",gap:10}}>
           <span style={{fontSize:22}}>{emoji}</span>
@@ -1691,7 +1697,7 @@ const LogModal=({ex,pc,lastSets,targets,week,phase,allHistory,onSave,onClose})=>
         {/* Burnout section */}
         {phase>=1&&sets.every(s=>s.logged)&&!showBurnout&&(
           <div style={{background:C.red+"22",borderRadius:10,padding:"14px",border:`1px solid ${C.red}66`,marginTop:8}}>
-            <p style={{margin:"0 0 4px",fontSize:16,fontFamily:FD,color:C.red}}>BURNOUT SET</p>
+            <p style={{margin:"0 0 4px",fontSize:16,fontWeight:600,fontFamily:FD,color:C.red}}>Burnout Set</p>
             <p style={{margin:"0 0 10px",fontSize:11,color:C.muted,fontFamily:FB,lineHeight:1.5}}>
               {burnoutReady?"REST DONE. Drop 30%. Go to absolute failure. Every last rep.":"Rest 3 min then go to absolute failure. Drop 30% of working weight."}
             </p>
@@ -1705,7 +1711,7 @@ const LogModal=({ex,pc,lastSets,targets,week,phase,allHistory,onSave,onClose})=>
         )}
         {showBurnout&&(
           <div style={{background:C.red+"22",borderRadius:10,padding:"14px",border:`1px solid ${C.red}`,marginTop:8}}>
-            <p style={{margin:"0 0 10px",fontSize:16,fontFamily:FD,color:C.red}}>BURNOUT - ABSOLUTE FAILURE</p>
+            <p style={{margin:"0 0 10px",fontSize:16,fontWeight:600,fontFamily:FD,color:C.red}}>Burnout — Absolute Failure</p>
             <div style={{display:"flex",gap:8,marginBottom:8}}>
               {!ex.nw&&(
                 <div style={{flex:1}}>
@@ -1723,8 +1729,8 @@ const LogModal=({ex,pc,lastSets,targets,week,phase,allHistory,onSave,onClose})=>
             </div>
             <RIRSelect value={burnout.rir} onChange={v=>updB("rir",v)}/>
             <button onClick={()=>{onSave([...sets,{...burnout,isBurnout:true,logged:true}],sessionNote);}}
-              style={{width:"100%",marginTop:12,background:C.red,color:"#000",border:"none",borderRadius:8,padding:"14px",fontSize:15,fontWeight:"bold",cursor:"pointer",fontFamily:FC,letterSpacing:"0.1em",textTransform:"uppercase"}}>
-              SAVE + FINISH SESSION
+              style={{width:"100%",marginTop:12,background:C.red,color:"#fff",border:"none",borderRadius:14,padding:"14px",fontSize:14,fontWeight:600,cursor:"pointer",fontFamily:FD,letterSpacing:"0.02em"}}>
+              Save + Finish Session
             </button>
           </div>
         )}
@@ -1781,7 +1787,7 @@ const SessionComplete=({wo,data,ph,di,week,onClose})=>{
     <div style={{position:"fixed",inset:0,zIndex:300,display:"flex",alignItems:"center",justifyContent:"center",background:"rgba(0,0,0,0.95)",padding:16}}>
       <div style={{width:"100%",maxWidth:400,background:C.card,borderRadius:16,padding:"24px 20px",border:`1px solid ${PHASES[ph].color}44`,maxHeight:"85vh",overflowY:"auto"}}>
         <div style={{textAlign:"center",marginBottom:20}}>
-          <p style={{margin:0,fontSize:30,fontFamily:FD,color:PHASES[ph].color,letterSpacing:"0.1em",marginBottom:4}}>SESSION COMPLETE</p>
+          <p style={{margin:0,fontSize:22,fontWeight:600,fontFamily:FD,color:PHASES[ph].color,letterSpacing:"0.02em",marginBottom:4}}>Session Complete</p>
           <p style={{margin:"4px 0 0",fontSize:12,color:C.muted,fontFamily:FB}}>Week {week} - {wo.label}</p>
         </div>
         <div style={{display:"flex",gap:8,marginBottom:16}}>
@@ -1860,25 +1866,29 @@ const LoginScreen = ({onLogin}) => {
   const handleClear = () => { setPin(""); setError(""); };
 
   return (
-    <div style={{background:C.bg,minHeight:"100vh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"24px",paddingTop:"calc(24px + env(safe-area-inset-top))",paddingBottom:"calc(24px + env(safe-area-inset-bottom))",maxWidth:430,margin:"0 auto"}}>
+    <div style={{background:C.bg,minHeight:"100vh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"24px",paddingTop:"calc(24px + env(safe-area-inset-top))",paddingBottom:"calc(24px + env(safe-area-inset-bottom))",maxWidth:430,margin:"0 auto",position:"relative",overflow:"hidden"}}>
+      {/* Soft ambient glow */}
+      <div style={{position:"absolute",top:"18%",left:"50%",transform:"translateX(-50%)",width:320,height:320,borderRadius:"50%",background:"radial-gradient(circle, rgba(212,168,87,0.14) 0%, rgba(212,168,87,0) 70%)",pointerEvents:"none"}}/>
+
       {/* Logo */}
-      <div style={{textAlign:"center",marginBottom:32}}>
-        <p style={{margin:"0 0 2px",fontSize:13,color:C.yellow,letterSpacing:"0.4em",fontFamily:FC}}>HUSTLE & HEART</p>
-        <p style={{margin:0,fontSize:48,fontFamily:FD,letterSpacing:"0.1em",color:C.text,lineHeight:1}}>BIG & SCARY</p>
-        <p style={{margin:"6px 0 0",fontSize:12,color:C.muted,fontFamily:FB}}>12-Week Transformation Program</p>
+      <div style={{textAlign:"center",marginBottom:36,position:"relative"}}>
+        <p style={{margin:"0 0 6px",fontSize:12,color:C.yellow,letterSpacing:"0.38em",fontFamily:FC,fontWeight:600}}>HUSTLE &amp; HEART</p>
+        <p style={{margin:0,fontSize:34,fontWeight:700,fontFamily:FD,letterSpacing:"-0.01em",color:C.text,lineHeight:1.05}}>Big &amp; Scary</p>
+        <p style={{margin:"8px 0 0",fontSize:12,color:C.muted,fontFamily:FB}}>12-Week Transformation Program</p>
       </div>
 
       {/* User selection */}
-      <div style={{width:"100%",marginBottom:28}}>
-        <p style={{margin:"0 0 12px",fontSize:10,color:C.muted,letterSpacing:"0.2em",textTransform:"uppercase",fontFamily:FC,textAlign:"center"}}>Who's training?</p>
+      <div style={{width:"100%",marginBottom:24,position:"relative"}}>
+        <p style={{margin:"0 0 12px",fontSize:10,color:C.muted,letterSpacing:"0.18em",textTransform:"uppercase",fontFamily:FC,textAlign:"center"}}>Who's training?</p>
         <div style={{display:"flex",gap:10}}>
           {Object.entries(USERS).map(([p, u]) => (
             <button key={p} onClick={() => { setSelectedUser(p); setPin(""); setError(""); }}
-              style={{flex:1,padding:"16px 8px",borderRadius:12,cursor:"pointer",textAlign:"center",
-                background: selectedUser===p ? C.yellow+"22" : C.card,
-                border: `2px solid ${selectedUser===p ? C.yellow : C.border}`,
+              style={{flex:1,padding:"18px 8px",borderRadius:18,cursor:"pointer",textAlign:"center",
+                background: selectedUser===p ? "rgba(212,168,87,0.12)" : C.card,
+                border: `1.5px solid ${selectedUser===p ? C.yellow : C.border}`,
+                boxShadow: selectedUser===p ? "0 6px 20px rgba(212,168,87,0.15)" : "none",
                 transition:"all 0.2s"}}>
-                <p style={{margin:0,fontSize:22,fontFamily:FD,letterSpacing:"0.08em",
+                <p style={{margin:0,fontSize:17,fontWeight:600,fontFamily:FD,letterSpacing:"-0.005em",
                 color: selectedUser===p ? C.yellow : C.text}}>{u.name}</p>
             </button>
           ))}
@@ -1887,13 +1897,13 @@ const LoginScreen = ({onLogin}) => {
 
       {/* PIN display */}
       {selectedUser && (
-        <div style={{width:"100%"}}>
-          <p style={{margin:"0 0 10px",fontSize:10,color:C.muted,letterSpacing:"0.2em",textTransform:"uppercase",fontFamily:FC,textAlign:"center"}}>Enter PIN</p>
+        <div style={{width:"100%",position:"relative"}}>
+          <p style={{margin:"0 0 10px",fontSize:10,color:C.muted,letterSpacing:"0.18em",textTransform:"uppercase",fontFamily:FC,textAlign:"center"}}>Enter PIN</p>
           <div style={{display:"flex",gap:12,justifyContent:"center",marginBottom:8}}>
             {[0,1,2,3].map(i => (
-              <div key={i} style={{width:16,height:16,borderRadius:"50%",
+              <div key={i} style={{width:14,height:14,borderRadius:"50%",
                 background: i < pin.length ? C.yellow : "transparent",
-                border: `2px solid ${i < pin.length ? C.yellow : C.dim}`,
+                border: `1.5px solid ${i < pin.length ? C.yellow : C.dim}`,
                 transition:"all 0.2s"}}/>
             ))}
           </div>
@@ -1903,12 +1913,12 @@ const LoginScreen = ({onLogin}) => {
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginTop:16}}>
             {[1,2,3,4,5,6,7,8,9,"",0,"del"].map((d,i) => (
               <button key={i} onClick={() => d===""?null:d==="del"?handleClear():handlePinPress(String(d))}
-                style={{padding:"18px 8px",borderRadius:12,fontSize:d==="del"?14:22,
-                  fontFamily:d==="del"?FC:FD,fontWeight:"bold",cursor:d===""?"default":"pointer",
+                style={{padding:"17px 8px",borderRadius:16,fontSize:d==="del"?13:19,
+                  fontFamily:d==="del"?FC:FD,fontWeight:600,cursor:d===""?"default":"pointer",
                   background:d===""?"transparent":C.card,
                   color:d==="del"?C.muted:C.text,
                   border:`1px solid ${d===""?"transparent":C.border}`,
-                  letterSpacing:d==="del"?"0.05em":"0.1em",
+                  letterSpacing:d==="del"?"0.05em":"0",
                   opacity:d===""?0:1,
                   transition:"all 0.1s"}}>
                 {d==="del"?"CLEAR":d}
@@ -1918,7 +1928,7 @@ const LoginScreen = ({onLogin}) => {
         </div>
       )}
 
-      <p style={{margin:"24px 0 0",fontSize:10,color:C.dim,fontFamily:FB,textAlign:"center"}}>
+      <p style={{margin:"24px 0 0",fontSize:10,color:C.dim,fontFamily:FB,textAlign:"center",position:"relative"}}>
         Andrew: 1111 · Beaudy: 2222
       </p>
     </div>
@@ -1929,7 +1939,7 @@ const LoginScreen = ({onLogin}) => {
 const GoalsPanel=({selected,onToggle,onClose})=>(
   <div style={{position:"fixed",inset:0,zIndex:300,display:"flex",alignItems:"flex-end",background:"rgba(0,0,0,0.9)"}} onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
     <div style={{width:"100%",maxWidth:430,margin:"0 auto",background:C.card,borderRadius:"16px 16px 0 0",padding:"24px 20px calc(40px + env(safe-area-inset-bottom))",maxHeight:"80vh",overflowY:"auto"}}>
-      <p style={{margin:"0 0 4px",fontSize:20,fontFamily:FD,color:C.yellow}}>YOUR GOALS</p>
+      <p style={{margin:"0 0 4px",fontSize:20,fontWeight:600,fontFamily:FD,color:C.yellow}}>Your Goals</p>
       <p style={{margin:"0 0 16px",fontSize:11,color:C.muted,fontFamily:FB}}>Pick what you're training toward. This shapes what gets recommended in Mobility and Skills.</p>
       <div style={{display:"flex",flexWrap:"wrap",gap:8,marginBottom:20}}>
         {GOALS.map(g=>{
@@ -2022,7 +2032,7 @@ const RoutineRunner=({routine,onComplete,onClose})=>{
 const ConditioningRPEModal=({onSubmit,onClose})=>(
   <div style={{position:"fixed",inset:0,zIndex:300,display:"flex",alignItems:"flex-end",background:"rgba(0,0,0,0.92)"}} onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
     <div style={{width:"100%",maxWidth:430,margin:"0 auto",background:C.card,borderRadius:"16px 16px 0 0",padding:"24px 20px calc(40px + env(safe-area-inset-bottom))",textAlign:"center"}}>
-      <p style={{margin:"0 0 4px",fontSize:20,fontFamily:FD,color:C.blueBright}}>HOW HARD WAS THAT?</p>
+      <p style={{margin:"0 0 4px",fontSize:20,fontWeight:600,fontFamily:FD,color:C.blueBright}}>How Hard Was That?</p>
       <p style={{margin:"0 0 18px",fontSize:12,color:C.muted,fontFamily:FB,lineHeight:1.5}}>Rate the session overall, 1 (easy) to 10 (max effort). This is how we'll know the training is working — the same protocol should feel easier over time.</p>
       <div style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:8,marginBottom:12}}>
         {[1,2,3,4,5,6,7,8,9,10].map(v=>(
@@ -2317,48 +2327,56 @@ function AppInner({pin, user, onLogout}){
     <div style={{background:C.bg,minHeight:"100vh",color:C.text,fontFamily:FB,maxWidth:430,margin:"0 auto",position:"relative",paddingBottom:"calc(80px + env(safe-area-inset-bottom))"}}>
 
       {/* HEADER */}
-      <div style={{paddingTop:"calc(14px + env(safe-area-inset-top))",paddingLeft:16,paddingRight:16,paddingBottom:10,borderBottom:`1px solid ${C.border}`,background:C.surface}}>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+      <div style={{paddingTop:"calc(16px + env(safe-area-inset-top))",paddingLeft:18,paddingRight:18,paddingBottom:16,background:C.surface}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
+          <p style={{margin:0,fontSize:10,color:C.muted,letterSpacing:"0.28em",fontFamily:FB,fontWeight:600}}>HUSTLE &amp; HEART</p>
+          <div style={{display:"flex",gap:6}}>
+            <button onClick={()=>setGoalsOpen(true)}
+              style={{background:"transparent",border:`1px solid ${goals.length?C.yellow:C.border}`,borderRadius:20,padding:"5px 11px",cursor:"pointer",fontSize:10,color:goals.length?C.yellow:C.steel,fontFamily:FB,fontWeight:500}}>
+              Goals{goals.length?` · ${goals.length}`:""}
+            </button>
+            <button onClick={onLogout}
+              style={{background:"transparent",border:`1px solid ${C.border}`,borderRadius:20,padding:"5px 11px",cursor:"pointer",fontSize:10,color:C.steel,fontFamily:FB,fontWeight:500}}>
+              Switch
+            </button>
+          </div>
+        </div>
+
+        <div style={{marginBottom:16}}>
+          <h1 style={{margin:"0 0 6px",fontSize:23,fontWeight:600,fontFamily:FD,letterSpacing:"-0.01em",lineHeight:1.1,color:C.text}}>
+            {user.name}'s Program
+          </h1>
+          <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
+            <span style={{fontSize:12,color:pc,fontFamily:FB,fontWeight:600}}>{PHASES[ph].label} · Week {currentWeek}</span>
+            <span style={{width:3,height:3,borderRadius:"50%",background:C.dim}}/>
+            <span style={{fontSize:12,color:C.steel,fontFamily:FB}}>{isTrainingToday?"Training Day":"Rest Day"}</span>
+            {deload&&<span style={{fontSize:9,padding:"2px 8px",borderRadius:10,background:"rgba(212,168,87,0.14)",color:C.yellow,fontFamily:FB,fontWeight:600,letterSpacing:"0.04em"}}>DELOAD</span>}
+          </div>
+          {goals.length>0&&(
+            <p style={{margin:"6px 0 0",fontSize:11,color:C.steel,fontFamily:FB}}>
+              Focus: {goals.map(gid=>GOALS.find(g=>g.id===gid)?.label).filter(Boolean).join(" · ")}
+            </p>
+          )}
+        </div>
+
+        {/* Glass stat card */}
+        <div style={{background:"rgba(255,255,255,0.04)",backdropFilter:"blur(10px)",WebkitBackdropFilter:"blur(10px)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:18,padding:"14px 16px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
           <div>
-            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:2}}>
-              <p style={{margin:0,fontSize:10,color:C.yellow,letterSpacing:"0.3em",fontFamily:FC}}>HUSTLE & HEART</p>
-              <div style={{display:"flex",gap:6,marginLeft:"auto"}}>
-                <button onClick={()=>setGoalsOpen(true)}
-                  style={{background:C.surface,border:`1px solid ${C.border}`,borderRadius:6,padding:"2px 8px",cursor:"pointer",fontSize:9,color:goals.length?C.yellow:C.muted,fontFamily:FC,letterSpacing:"0.08em",textTransform:"uppercase"}}>
-                  GOALS{goals.length?` (${goals.length})`:""}
-                </button>
-                <button onClick={onLogout}
-                  style={{background:C.surface,border:`1px solid ${C.border}`,borderRadius:6,padding:"2px 8px",cursor:"pointer",fontSize:9,color:C.muted,fontFamily:FC,letterSpacing:"0.08em",textTransform:"uppercase"}}>
-                  SWITCH
-                </button>
-              </div>
-            </div>
-            <h1 style={{margin:"0 0 1px",fontSize:26,fontFamily:FD,letterSpacing:"0.05em",lineHeight:1}}>
-              {user.name.toUpperCase()}'S PROGRAM
-            </h1>
-            <div style={{display:"flex",gap:8,marginTop:2,flexWrap:"wrap"}}>
-              <span style={{fontSize:10,color:pc,fontFamily:FC,letterSpacing:"0.05em"}}>{PHASES[ph].label} · Wk {currentWeek}</span>
-              {deload&&<span style={{fontSize:9,padding:"1px 6px",borderRadius:4,background:C.yellow+"22",color:C.yellow,fontFamily:FC}}>DELOAD</span>}
-              <span style={{fontSize:10,color:C.steel,fontFamily:FC}}>{isTrainingToday?"Training Day":"Rest Day"}</span>
-            </div>
-            {goals.length>0&&(
-              <p style={{margin:"4px 0 0",fontSize:10,color:C.steel,fontFamily:FB}}>
-                Focus: {goals.map(gid=>GOALS.find(g=>g.id===gid)?.label).filter(Boolean).join(" · ")}
-              </p>
-            )}
+            <p style={{margin:"0 0 3px",fontSize:10,letterSpacing:"0.06em",color:C.muted,fontFamily:FB,fontWeight:600}}>BODY FAT</p>
+            <p style={{margin:0,fontSize:21,fontWeight:700,color:C.text,fontFamily:FD,lineHeight:1}}>
+              {curBF.toFixed(1)}<span style={{fontSize:12,color:C.muted,fontWeight:500}}> → 8.5%</span>
+            </p>
           </div>
-          <div style={{background:C.card,borderRadius:10,padding:"7px 11px",border:`1px solid ${C.border}`,textAlign:"right"}}>
-            <p style={{margin:0,fontSize:9,color:C.muted,fontFamily:FC}}>BF GOAL</p>
-            <p style={{margin:"2px 0 0",fontSize:20,fontFamily:FD,color:C.yellow,lineHeight:1}}>{curBF.toFixed(1)}%</p>
-            <div style={{width:70,height:3,background:C.border,borderRadius:2,marginTop:3}}>
-              <div style={{width:`${bfProg*100}%`,height:"100%",background:C.yellow,borderRadius:2}}/>
-            </div>
-            <p style={{margin:"2px 0 0",fontSize:9,color:C.muted,fontFamily:FC}}>→ 8.5%</p>
-          </div>
+          <svg width="48" height="48" viewBox="0 0 48 48">
+            <circle cx="24" cy="24" r="20" fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="5"/>
+            <circle cx="24" cy="24" r="20" fill="none" stroke={C.greenBright} strokeWidth="5" strokeLinecap="round"
+              strokeDasharray={125.7} strokeDashoffset={125.7*(1-bfProg)} transform="rotate(-90 24 24)" style={{transition:"stroke-dashoffset 0.4s ease"}}/>
+            <text x="24" y="28" textAnchor="middle" fill={C.text} fontSize="12" fontWeight="700" fontFamily={FD}>{Math.round(bfProg*100)}%</text>
+          </svg>
         </div>
       </div>
 
-      <div style={{padding:"12px 14px 0"}}>
+      <div style={{padding:"14px 14px 0"}}>
 
         {/* ══ WORKOUT TAB ══════════════════════════════════════════════════ */}
         {tab==="workout"&&(
@@ -2412,9 +2430,9 @@ function AppInner({pin, user, onLogout}){
             )}
 
             {/* Lift / Cardio toggle */}
-            <div style={{display:"flex",background:C.card,borderRadius:8,padding:3,marginBottom:10,border:`1px solid ${C.border}`}}>
+            <div style={{display:"flex",background:C.card,borderRadius:12,padding:3,marginBottom:10,border:`1px solid ${C.border}`}}>
               {[["lift","Lift"],["cardio","Cardio (VO2max)"]].map(([m,l])=>(
-                <button key={m} onClick={()=>setTrainMode(m)} style={{flex:1,padding:"9px",borderRadius:6,background:trainMode===m?pc:"transparent",color:trainMode===m?"#000":C.muted,border:"none",fontSize:12,fontWeight:"bold",cursor:"pointer",fontFamily:FC,textTransform:"uppercase"}}>
+                <button key={m} onClick={()=>setTrainMode(m)} style={{flex:1,padding:"9px",borderRadius:9,background:trainMode===m?pc+"14":"transparent",color:trainMode===m?pc:C.muted,border:`1px solid ${trainMode===m?pc:"transparent"}`,fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:FD}}>
                   {l}
                 </button>
               ))}
@@ -2425,7 +2443,7 @@ function AppInner({pin, user, onLogout}){
             {/* Day tabs */}
             <div style={{display:"flex",gap:6,marginBottom:10}}>
               {WO[ph].map((d,i)=>(
-                <button key={i} onClick={()=>setDi(i)} style={{flex:1,padding:"9px 4px",borderRadius:6,background:di===i?pc:C.card,color:di===i?"#000":C.muted,border:`1px solid ${di===i?pc:C.border}`,fontSize:11,fontWeight:"bold",cursor:"pointer",fontFamily:FC,textTransform:"uppercase"}}>
+                <button key={i} onClick={()=>setDi(i)} style={{flex:1,padding:"10px 4px",borderRadius:12,background:di===i?pc+"14":C.card,color:di===i?pc:C.muted,border:`1px solid ${di===i?pc:"transparent"}`,fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:FD}}>
                   {d.day}
                 </button>
               ))}
@@ -2448,11 +2466,11 @@ function AppInner({pin, user, onLogout}){
             )}
 
             {/* Workout card */}
-            <div style={{background:C.card,borderRadius:12,overflow:"hidden",border:`1px solid ${C.border}`,marginBottom:10}}>
-              <div style={{background:pc,padding:"12px 16px"}}>
-                <p style={{margin:0,fontSize:10,color:"rgba(0,0,0,0.6)",letterSpacing:"0.2em",textTransform:"uppercase",fontFamily:FC}}>{PHASES[ph].sub} - {wo.day}</p>
-                <p style={{margin:"2px 0 2px",fontSize:22,fontFamily:FD,letterSpacing:"0.05em",color:"#000"}}>{wo.label}</p>
-                <p style={{margin:0,fontSize:10,color:"rgba(0,0,0,0.55)",fontFamily:FB}}>{wo.focus}</p>
+            <div style={{background:C.card,borderRadius:20,overflow:"hidden",boxShadow:"0 8px 24px rgba(0,0,0,0.25)",marginBottom:10}}>
+              <div style={{padding:"18px 18px 14px"}}>
+                <p style={{margin:0,fontSize:10,color:C.muted,letterSpacing:"0.1em",textTransform:"uppercase",fontFamily:FB,fontWeight:600}}>{PHASES[ph].sub} · {wo.day}</p>
+                <p style={{margin:"5px 0 4px",fontSize:20,fontFamily:FD,fontWeight:600,letterSpacing:"-0.01em",color:C.text}}>{wo.label}</p>
+                <p style={{margin:0,fontSize:11,color:C.steel,fontFamily:FB,lineHeight:1.5}}>{wo.focus}</p>
               </div>
               {/* Warm-up protocol */}
               {wo.warmup&&wo.warmup.length>0&&(
@@ -2598,18 +2616,18 @@ function AppInner({pin, user, onLogout}){
                   )}
                   <div style={{display:"flex",gap:6,marginBottom:10}}>
                     {sessions.map((s,i)=>(
-                      <button key={s.id} onClick={()=>setCi(i)} style={{flex:1,padding:"9px 4px",borderRadius:6,background:ci===i?C.blueBright:C.card,color:ci===i?"#000":C.muted,border:`1px solid ${ci===i?C.blueBright:C.border}`,fontSize:11,fontWeight:"bold",cursor:"pointer",fontFamily:FC,textTransform:"uppercase"}}>
+                      <button key={s.id} onClick={()=>setCi(i)} style={{flex:1,padding:"10px 4px",borderRadius:12,background:ci===i?C.blueBright+"14":C.card,color:ci===i?C.blueBright:C.muted,border:`1px solid ${ci===i?C.blueBright:"transparent"}`,fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:FD}}>
                         {s.title}
                       </button>
                     ))}
                   </div>
-                  <div style={{background:C.card,borderRadius:12,overflow:"hidden",border:`1px solid ${C.border}`,marginBottom:10}}>
-                    <div style={{background:C.blueBright,padding:"12px 16px"}}>
-                      <p style={{margin:0,fontSize:10,color:"rgba(0,0,0,0.6)",letterSpacing:"0.2em",textTransform:"uppercase",fontFamily:FC}}>{PHASES[ph].label} — VO2max</p>
-                      <p style={{margin:"2px 0 2px",fontSize:22,fontFamily:FD,letterSpacing:"0.05em",color:"#000"}}>{session.title}</p>
-                      <p style={{margin:0,fontSize:10,color:"rgba(0,0,0,0.55)",fontFamily:FB}}>{session.focus}</p>
+                  <div style={{background:C.card,borderRadius:20,overflow:"hidden",boxShadow:"0 8px 24px rgba(0,0,0,0.25)",marginBottom:10}}>
+                    <div style={{padding:"18px 18px 14px"}}>
+                      <p style={{margin:0,fontSize:10,color:C.muted,letterSpacing:"0.1em",textTransform:"uppercase",fontFamily:FB,fontWeight:600}}>{PHASES[ph].label} · VO2max</p>
+                      <p style={{margin:"5px 0 4px",fontSize:20,fontFamily:FD,fontWeight:600,letterSpacing:"-0.01em",color:C.text}}>{session.title}</p>
+                      <p style={{margin:0,fontSize:11,color:C.steel,fontFamily:FB,lineHeight:1.5}}>{session.focus}</p>
                     </div>
-                    <div style={{padding:"10px 14px"}}>
+                    <div style={{padding:"4px 14px 14px"}}>
                       <p style={{margin:"0 0 8px",fontSize:10,color:C.greenBright,letterSpacing:"0.15em",textTransform:"uppercase",fontFamily:FC}}>Warm-Up</p>
                       {session.warmup.map((wu,i)=>(
                         <p key={i} style={{margin:"0 0 6px",fontSize:12,color:C.text,fontFamily:FB}}>
@@ -2626,16 +2644,16 @@ function AppInner({pin, user, onLogout}){
                     </div>
                   </div>
                   <button onClick={()=>setRunningConditioning(session)}
-                    style={{width:"100%",background:C.blueBright,color:"#000",border:"none",borderRadius:10,padding:"14px",fontSize:14,fontWeight:"bold",cursor:"pointer",fontFamily:FC,letterSpacing:"0.1em",marginBottom:10}}>
-                    START SESSION
+                    style={{width:"100%",background:C.blueBright,color:"#0A1420",border:"none",borderRadius:14,padding:"14px",fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:FD,letterSpacing:"0.02em",marginBottom:10}}>
+                    Start Session
                   </button>
                 </>
               );
             })()}
 
             <button onClick={()=>setTimerOpen(true)}
-              style={{width:"100%",background:C.card,border:`1px solid ${C.border}`,borderRadius:10,padding:"12px",color:C.yellow,fontSize:13,cursor:"pointer",fontFamily:FC,letterSpacing:"0.1em",textTransform:"uppercase",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
-              REST TIMER
+              style={{width:"100%",background:C.card,border:`1px solid ${C.border}`,borderRadius:14,padding:"12px",color:C.yellow,fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:FD,display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
+              Rest Timer
             </button>
           </div>
         )}
@@ -2643,26 +2661,26 @@ function AppInner({pin, user, onLogout}){
         {/* ══ FUEL TAB ═════════════════════════════════════════════════════ */}
         {tab==="meals"&&(
           <div>
-            <div style={{background:C.card,borderRadius:10,padding:"8px 12px",marginBottom:10,borderLeft:`3px solid ${pc}`}}>
-              <p style={{margin:0,fontSize:11,color:pc,fontFamily:FC}}>
+            <div style={{background:C.card,borderRadius:14,padding:"10px 14px",marginBottom:10,border:`1px solid ${pc}33`}}>
+              <p style={{margin:0,fontSize:11,color:pc,fontFamily:FB,fontWeight:600}}>
                 Auto-synced to {PHASES[ph].label} — Week {currentWeek}
               </p>
             </div>
-            <div style={{display:"flex",background:C.card,borderRadius:8,padding:3,marginBottom:12,border:`1px solid ${C.border}`}}>
+            <div style={{display:"flex",background:C.card,borderRadius:12,padding:3,marginBottom:12,border:`1px solid ${C.border}`}}>
               {["training","rest"].map(d=>(
-                <button key={d} onClick={()=>setMealDt(d)} style={{flex:1,padding:"10px",borderRadius:6,background:mealDt===d?pc:"transparent",color:mealDt===d?"#000":C.muted,border:"none",fontSize:12,fontWeight:"bold",cursor:"pointer",fontFamily:FC,textTransform:"uppercase"}}>
+                <button key={d} onClick={()=>setMealDt(d)} style={{flex:1,padding:"10px",borderRadius:9,background:mealDt===d?pc+"14":"transparent",color:mealDt===d?pc:C.muted,border:`1px solid ${mealDt===d?pc:"transparent"}`,fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:FD}}>
                   {d==="training"?"Training Day":"Rest Day"}
                 </button>
               ))}
             </div>
-            <div style={{background:C.card,borderRadius:12,padding:"12px 16px",marginBottom:12,border:`1px solid ${C.border}`}}>
-              <p style={{margin:"0 0 10px",fontSize:10,color:C.muted,letterSpacing:"0.2em",textTransform:"uppercase",fontFamily:FC}}>
-                Daily Totals - {PHASES[ph].label} - {mealDt==="training"?"Training":"Rest"} Day
+            <div style={{background:C.card,borderRadius:18,padding:"16px 16px",marginBottom:12,boxShadow:"0 8px 24px rgba(0,0,0,0.25)"}}>
+              <p style={{margin:"0 0 12px",fontSize:10,color:C.muted,letterSpacing:"0.1em",textTransform:"uppercase",fontFamily:FB,fontWeight:600}}>
+                Daily Totals · {PHASES[ph].label} · {mealDt==="training"?"Training":"Rest"} Day
               </p>
               <div style={{display:"flex",gap:8}}>
                 {[["~"+mp.cal,"kcal",C.yellow],["~"+mp.p+"g","protein",C.green],["~"+mp.c+"g","carbs",C.blue],["~"+mp.f+"g","fat",C.steel]].map(([v,l,col])=>(
-                  <div key={l} style={{flex:1,textAlign:"center",background:C.surface,borderRadius:8,padding:"10px 4px",borderTop:`2px solid ${col}`}}>
-                    <p style={{margin:0,fontSize:13,fontWeight:"bold",fontFamily:FC,color:col}}>{v}</p>
+                  <div key={l} style={{flex:1,textAlign:"center",background:"rgba(255,255,255,0.03)",borderRadius:12,padding:"10px 4px",border:`1px solid ${col}33`}}>
+                    <p style={{margin:0,fontSize:14,fontWeight:600,fontFamily:FD,color:col}}>{v}</p>
                     <p style={{margin:0,fontSize:9,color:C.muted,textTransform:"uppercase"}}>{l}</p>
                   </div>
                 ))}
@@ -2671,8 +2689,8 @@ function AppInner({pin, user, onLogout}){
             <MealBlock section={mp.bkfst} title="Breakfast" emoji="d" pc={pc}/>
             <MealBlock section={mp.lunch} title="Lunch" emoji="e" pc={pc}/>
             <MealBlock section={mp.dinner} title="Dinner" emoji="f" pc={pc}/>
-            <div style={{background:C.card,borderRadius:10,padding:"12px 14px",border:`1px solid ${C.yellow}44`,marginBottom:8}}>
-              <p style={{margin:"0 0 6px",fontSize:11,color:C.yellow,fontFamily:FC,textTransform:"uppercase"}}>Coach Note</p>
+            <div style={{background:C.card,borderRadius:16,padding:"14px 16px",border:`1px solid ${C.yellow}33`,marginBottom:8}}>
+              <p style={{margin:"0 0 6px",fontSize:10,color:C.yellow,letterSpacing:"0.1em",fontFamily:FB,fontWeight:600,textTransform:"uppercase"}}>Coach Note</p>
               <p style={{margin:0,fontSize:12,color:C.muted,lineHeight:1.6,fontFamily:FB}}>
                 Current target: {mp.cal.toLocaleString()} kcal · {mp.p}g protein · {mp.c}g carbs. Targets hold steady or rise across phases now rather than cutting further — you're adding muscle, strength, and VO2max work, not just cutting fat. Fix sleep first - 7 hrs unlocks more than any macro change would.
               </p>
@@ -2687,7 +2705,7 @@ function AppInner({pin, user, onLogout}){
             <div style={{background:C.card,borderRadius:12,padding:"14px 16px",marginBottom:12,border:`1px solid ${C.border}`}}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
                 <div>
-                  <p style={{margin:0,fontSize:18,fontFamily:FD,color:C.green}}>DAILY SUPPS</p>
+                  <p style={{margin:0,fontSize:18,fontWeight:600,fontFamily:FD,color:C.green}}>Daily Supps</p>
                   <p style={{margin:0,fontSize:11,color:C.muted,fontFamily:FB}}>{new Date().toLocaleDateString("en-US",{weekday:"long",month:"short",day:"numeric"})}</p>
                 </div>
                 <div style={{background:C.green+"22",borderRadius:10,padding:"6px 12px",textAlign:"center"}}>
@@ -2755,7 +2773,7 @@ function AppInner({pin, user, onLogout}){
 
             {/* Caffeine protocol reminder */}
             <div style={{background:C.card,borderRadius:12,padding:"12px 14px",marginBottom:12,border:`1px solid ${CAFF_PHASES[ph].color}44`}}>
-              <p style={{margin:"0 0 6px",fontSize:14,fontFamily:FD,color:CAFF_PHASES[ph].color}}>CAFFEINE TODAY - {CAFF_PHASES[ph].total}</p>
+              <p style={{margin:"0 0 6px",fontSize:14,fontWeight:600,fontFamily:FD,color:CAFF_PHASES[ph].color}}>Caffeine Today · {CAFF_PHASES[ph].total}</p>
               <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
                 {CAFF_PHASES[ph].items.map((item,i)=>{
                   const col=item.status==="on"?C.green:item.status==="cut"?C.red:C.yellow;
@@ -2773,7 +2791,7 @@ function AppInner({pin, user, onLogout}){
             <div style={{background:C.card,borderRadius:12,padding:"12px 14px",marginBottom:12,border:`1px solid ${C.border}`}}>
               <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:6}}>
                 <Ic n="camera" sz={18} col={C.steel}/>
-                <p style={{margin:0,fontSize:14,fontFamily:FD,color:C.text,letterSpacing:"0.05em"}}>WEEKLY PROGRESS PHOTO</p>
+                <p style={{margin:0,fontSize:14,fontWeight:600,fontFamily:FD,color:C.text}}>Weekly Progress Photo</p>
               </div>
               <p style={{margin:"0 0 8px",fontSize:11,color:C.muted,fontFamily:FB,lineHeight:1.5}}>
                 Every Sunday morning. Same time. Same lighting. Same pose. Front, side, and back. These photos will show results the scale misses.
@@ -2790,7 +2808,7 @@ function AppInner({pin, user, onLogout}){
 
             {/* Mobility reminder */}
             <div style={{background:C.card,borderRadius:12,padding:"12px 14px",border:`1px solid ${C.border}`}}>
-              <p style={{margin:"0 0 8px",fontSize:14,fontFamily:FD,color:C.yellow}}>DAILY MOBILITY - 10 MIN</p>
+              <p style={{margin:"0 0 8px",fontSize:14,fontWeight:600,fontFamily:FD,color:C.yellow}}>Daily Mobility · 10 Min</p>
               {MOB.filter(m=>m.pri==="CRITICAL").map((m,i)=>(
                 <p key={i} style={{margin:"0 0 5px",fontSize:11,color:C.muted,fontFamily:FB}}><span style={{color:C.red}}>! </span><span style={{color:C.text,fontWeight:"bold"}}>{m.title}</span> - {m.time}</p>
               ))}
@@ -2933,7 +2951,7 @@ function AppInner({pin, user, onLogout}){
             <div style={{background:C.card,borderRadius:12,padding:"14px 16px",marginBottom:12,border:`1px solid ${C.yellow}44`}}>
               <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12}}>
                 <Ic n="trophy" sz={18} col={C.yellow}/>
-                <p style={{margin:0,fontSize:18,fontFamily:FD,color:C.yellow}}>PERSONAL RECORDS</p>
+                <p style={{margin:0,fontSize:18,fontWeight:600,fontFamily:FD,color:C.yellow}}>Personal Records</p>
               </div>
               {WO[ph].map((day,di2)=>
                 day.ex.filter(ex=>isCompound(ex.n)&&!ex.nw).map((ex,ei)=>{
@@ -3012,7 +3030,7 @@ function AppInner({pin, user, onLogout}){
               {assessment?(
                 <>
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
-                    <p style={{margin:0,fontSize:16,fontFamily:FD,color:C.purple}}>YOUR PRIORITIES</p>
+                    <p style={{margin:0,fontSize:16,fontWeight:600,fontFamily:FD,color:C.purple}}>Your Priorities</p>
                     <button onClick={()=>setAssessmentOpen(true)} style={{background:"none",border:`1px solid ${C.border}`,borderRadius:6,padding:"3px 8px",fontSize:9,color:C.muted,fontFamily:FC,cursor:"pointer"}}>RETAKE</button>
                   </div>
                   <p style={{margin:0,fontSize:12,color:C.steel,fontFamily:FB,lineHeight:1.5}}>
@@ -3021,7 +3039,7 @@ function AppInner({pin, user, onLogout}){
                 </>
               ):(
                 <>
-                  <p style={{margin:"0 0 6px",fontSize:16,fontFamily:FD,color:C.purple}}>TAKE YOUR BASELINE ASSESSMENT</p>
+                  <p style={{margin:"0 0 6px",fontSize:16,fontWeight:600,fontFamily:FD,color:C.purple}}>Take Your Baseline Assessment</p>
                   <p style={{margin:"0 0 10px",fontSize:12,color:C.muted,fontFamily:FB,lineHeight:1.5}}>5 quick questions on ankles, hips, shoulders, squat depth, and balance — surfaces what to prioritize below.</p>
                   <button onClick={()=>setAssessmentOpen(true)} style={{width:"100%",background:C.purple,color:"#fff",border:"none",borderRadius:8,padding:"11px",fontSize:13,fontWeight:"bold",cursor:"pointer",fontFamily:FC,letterSpacing:"0.08em"}}>START ASSESSMENT</button>
                 </>
@@ -3046,7 +3064,7 @@ function AppInner({pin, user, onLogout}){
 
             {/* Chain reaction info (kept from original) */}
             <div style={{background:C.card,borderRadius:12,padding:"14px 16px",marginBottom:14,border:`1px solid ${C.yellow}33`}}>
-              <p style={{margin:"0 0 6px",fontSize:18,fontFamily:FD,color:C.yellow}}>THE CHAIN REACTION</p>
+              <p style={{margin:"0 0 6px",fontSize:18,fontWeight:600,fontFamily:FD,color:C.yellow}}>The Chain Reaction</p>
               <p style={{margin:0,fontSize:12,color:C.muted,lineHeight:1.7,fontFamily:FB}}>
                 <span style={{color:C.yellow}}>Tight feet/ankles</span> - restrict hips - anterior pelvic tilt - stress lumbar - limit thoracic - restrict shoulders - stress AC joint. Fix from the ground up. 10 min daily.
               </p>
@@ -3157,11 +3175,11 @@ function AppInner({pin, user, onLogout}){
       </div>{/* end padding div */}
 
       {/* ── BOTTOM NAV ────────────────────────────────────────────────────── */}
-      <div style={{position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",width:"100%",maxWidth:430,background:C.surface,borderTop:`1px solid ${C.border}`,display:"flex",paddingBottom:"calc(18px + env(safe-area-inset-bottom))"}}>
+      <div style={{position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",width:"100%",maxWidth:430,background:C.bg,borderTop:`1px solid rgba(255,255,255,0.06)`,display:"flex",paddingBottom:"calc(16px + env(safe-area-inset-bottom))"}}>
         {NAV.map(n=>(
-          <button key={n.id} onClick={()=>setTab(n.id)} style={{flex:1,background:"none",border:"none",padding:"11px 4px 2px",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:3}}>
-            <Ic n={n.ic} sz={22} col={tab===n.id?pc:C.dim}/>
-            <span style={{fontSize:8,color:tab===n.id?pc:C.dim,letterSpacing:"0.15em",textTransform:"uppercase",fontFamily:FC}}>{n.lb}</span>
+          <button key={n.id} onClick={()=>setTab(n.id)} style={{flex:1,background:"none",border:"none",padding:"12px 4px 2px",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:5}}>
+            <Ic n={n.ic} sz={19} col={tab===n.id?pc:C.muted}/>
+            <span style={{fontSize:9,color:tab===n.id?pc:C.muted,fontWeight:tab===n.id?600:500,fontFamily:FB}}>{n.lb}</span>
           </button>
         ))}
       </div>
