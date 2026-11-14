@@ -51,8 +51,14 @@ const FB="'Barlow',sans-serif";
 // ── STORAGE ────────────────────────────────────────────────────────────────
 // ── USERS ─────────────────────────────────────────────────────────────────
 const USERS = {
-  "1111": { name: "Andrew", emoji: "d" },
-  "2222": { name: "Beaudy", emoji: "e" },
+  "1111": { name: "Andrew", emoji: "d",
+    tagline: "The Recomp \u2014 Build muscle, lose fat, move like an athlete",
+    stats: { weight: 173.5, bf: 11.6, bfGoal: 8.5, muscle: 97.9,
+      prs: { bench: {c:205,t:225}, squat: {c:275,t:315}, deadlift: {c:375,t:405} },
+      trainCal: 2885, restCal: 2513, journey: [11.6, 10.5, 9.5, 8.5] } },
+  "2222": { name: "Beaudy", emoji: "e",
+    tagline: "The Recomp \u2014 Build muscle, lose fat, move like an athlete",
+    needsSetup: true },
 };
 const AUTH_KEY = "bigscary_auth";
 const getActiveUser = () => { try{return JSON.parse(localStorage.getItem(AUTH_KEY));}catch{return null;} };
@@ -115,6 +121,17 @@ const calcTarget = (lastSets, ex, week, phase) => {
   const lastW = parseFloat(workSets[0]?.w)||0;
   const tgtR  = typeof ex.r==="number" ? ex.r : parseInt(ex.r)||10;
   const nextW = allHit ? lastW + weightInc : lastW;
+  if (isDeload(week)) {
+    // Deload week: 60% of last working weight, rounded to nearest 5.
+    // No FAILURE/BURNOUT final set \u2014 recovery is the point of the week.
+    const dw = Math.max(0, Math.round((lastW * 0.6) / 5) * 5);
+    return Array.from({length:ex.s},()=>({
+      w: dw.toString(),
+      r: tgtR.toString(),
+      isBurnout: false,
+      deload: true,
+    }));
+  }
   if (phase===2) {
     return Array.from({length:ex.s},(_,i)=>({
       w: Math.max(0, nextW-(i*(lower?10:5))).toString(),
@@ -145,10 +162,10 @@ const calcWarmups = (workWeight, ex) => {
 const PHASES=[
   {id:0,label:"Phase 1",sub:"Recomp Foundation",weeks:"Wks 1-4",color:C.blue,
    goal:"Fix movement. Build habit. Protect muscle."},
-  {id:1,label:"Phase 2",sub:"Strength & Cut",weeks:"Wks 5-8",color:C.yellow,
-   goal:"Progressive overload. Tighten the deficit. Get hard."},
-  {id:2,label:"Phase 3",sub:"Shred",weeks:"Wks 9-12",color:C.red,
-   goal:"Strip the last fat. Look big and scary."},
+  {id:1,label:"Phase 2",sub:"Strength & Recomp",weeks:"Wks 5-8",color:C.yellow,
+   goal:"Progressive overload. Fuel the recomp. Get hard."},
+  {id:2,label:"Phase 3",sub:"Final Recomp",weeks:"Wks 9-12",color:C.red,
+   goal:"Recomp to the finish. Look big and scary."},
 ];
 
 // ── WORKOUTS ───────────────────────────────────────────────────────────────
@@ -163,15 +180,15 @@ const WO=[
       {n:"Band Lat Pulldown",r:"2x15",note:"Anchor band overhead, pull down. Warms up lats before rows.",nw:true},
       {n:"Cuban Press (light)",r:"2x10",note:"External rotation + press. The single best AC joint warm-up exercise.",nw:true},
     ],ex:[
-      {n:"Landmine Press",s:4,r:"10 ea",note:"AC-joint safe. Full ROM. Best shoulder builder for your situation.",inj:"shoulder"},
-      {n:"Chest-Supported DB Row",s:4,r:12,note:"Trunk muscle LOW. Rows are #1 priority. Go heavy every session.",inj:"none"},
-      {n:"DB Floor Press",s:3,r:12,note:"Limits dangerous ROM. Loads chest hard without AC stress.",inj:"shoulder"},
-      {n:"Face Pull (cable)",s:4,r:15,note:"Rotator cuff + rear delt health. Every upper session. Never skip.",inj:"shoulder"},
-      {n:"End-Range External Rotation Hold",s:2,r:"20s ea",note:"Arm at 90°, rotate to end-range external rotation and hold with light weight. Face pulls train the mid-range — cuff injury-prevention evidence points specifically to loading the end-range too.",inj:"shoulder"},
-      {n:"Incline DB Curl",s:3,r:12,note:"Long head bicep stretch at bottom. Arms that fill a sleeve.",inj:"none"},
-      {n:"Cable Tricep Pushdown",s:3,r:15,note:"Lateral head = arm width. Control the eccentric.",inj:"none"},
-      {n:"Dead Bug",s:3,r:"8 ea",note:"Core foundation. Low back stays glued. Breathe out on extension.",nw:true,inj:"none"},
-      {n:"Couch Stretch",s:1,r:"60s ea",note:"Front-split maintenance dose on your upper day — keeps the range you build on lower-body days. Mild stretch tension only, never sharp or pinching pain.",nw:true,inj:"hip"},
+      {n:"Landmine Press",s:4,r:"10 ea",note:"AC-joint safe. Full ROM. Best shoulder builder for your situation.",inj:"shoulder",core:true},
+      {n:"Chest-Supported DB Row",s:4,r:12,note:"Trunk muscle LOW. Rows are #1 priority. Go heavy every session.",inj:"none",core:true},
+      {n:"DB Floor Press",s:3,r:12,note:"Limits dangerous ROM. Loads chest hard without AC stress.",inj:"shoulder",core:true},
+      {n:"Face Pull (cable)",s:4,r:15,note:"Rotator cuff + rear delt health. Every upper session. Never skip.",inj:"shoulder",core:true},
+      {n:"End-Range External Rotation Hold",s:2,r:"20s ea",note:"Arm at 90°, rotate to end-range external rotation and hold with light weight. Face pulls train the mid-range — cuff injury-prevention evidence points specifically to loading the end-range too.",inj:"shoulder",opt:true},
+      {n:"Incline DB Curl",s:3,r:12,note:"Long head bicep stretch at bottom. Arms that fill a sleeve.",inj:"none",opt:true},
+      {n:"Cable Tricep Pushdown",s:3,r:15,note:"Lateral head = arm width. Control the eccentric.",inj:"none",opt:true},
+      {n:"Dead Bug",s:3,r:"8 ea",note:"Core foundation. Low back stays glued. Breathe out on extension.",nw:true,inj:"none",core:true},
+      {n:"Couch Stretch",s:1,r:"60s ea",note:"Front-split maintenance dose on your upper day — keeps the range you build on lower-body days. Mild stretch tension only, never sharp or pinching pain.",nw:true,inj:"hip",opt:true},
     ],mg:["chest","shoulders","back","biceps","triceps","core"]},
     {day:"Day B",label:"Lower - Glutes & Hams",focus:"Patellar tendinitis protocol. Hip mobility first. Posterior chain. Front-split progression.",
     warmup:[
@@ -182,15 +199,15 @@ const WO=[
       {n:"Ankle Circles",r:"20 ea direction",note:"Loosens ankles for better hip hinge mechanics.",nw:true},
       {n:"Reverse Hyper or Good Morning (BW)",r:"2x15",note:"Activates entire posterior chain. Primes glutes and hamstrings.",nw:true},
     ],ex:[
-      {n:"Hip 90/90 Mobility",s:2,r:"90s ea",note:"ALWAYS first. Non-negotiable for your hips and knees.",nw:true,inj:"hip"},
-      {n:"Active Straight-Leg Raise",s:2,r:"8 ea",note:"Active hamstring flexibility — the front-leg side of a front split. Raise the straight leg actively, lower under control. Mild tension only — never force it.",nw:true,inj:"hamstring"},
-      {n:"Hip Thrust (barbell)",s:4,r:12,note:"Glutes without knee stress. Load heavy. Trunk mass builder.",inj:"knee"},
-      {n:"Romanian Deadlift",s:4,r:10,note:"Hinge pattern. Minimal knee load. Go heavy.",inj:"knee"},
-      {n:"Leg Press (high foot)",s:3,r:15,note:"High placement = less patellar stress. Slow descent.",inj:"knee"},
-      {n:"Seated Leg Curl",s:3,r:12,note:"Isolate hamstrings. Controls patellar tendon load.",inj:"knee"},
-      {n:"Nordic Curl (assisted)",s:2,r:"4-6",note:"Eccentric loading at a long muscle length — the best-evidenced exercise in this program for both hamstring flexibility and strain-injury resilience. Directly serves the front split, not just leg day.",inj:"knee"},
-      {n:"Leg Extension (light)",s:2,r:15,note:"Second weekly quad touch — frequency matters as much as volume for growth, and quads only get one direct day otherwise.",inj:"knee"},
-      {n:"Calf Raise (standing)",s:3,r:20,note:"Tight calves worsen patella pain. Stretch at bottom.",inj:"foot"},
+      {n:"Hip 90/90 Mobility",s:2,r:"90s ea",note:"ALWAYS first. Non-negotiable for your hips and knees.",nw:true,inj:"hip",opt:true},
+      {n:"Active Straight-Leg Raise",s:2,r:"8 ea",note:"Active hamstring flexibility — the front-leg side of a front split. Raise the straight leg actively, lower under control. Mild tension only — never force it.",nw:true,inj:"hamstring",opt:true},
+      {n:"Hip Thrust (barbell)",s:4,r:12,note:"Glutes without knee stress. Load heavy. Trunk mass builder.",inj:"knee",core:true},
+      {n:"Romanian Deadlift",s:4,r:10,note:"Hinge pattern. Minimal knee load. Go heavy.",inj:"knee",core:true},
+      {n:"Leg Press (high foot)",s:3,r:15,note:"High placement = less patellar stress. Slow descent.",inj:"knee",core:true},
+      {n:"Seated Leg Curl",s:3,r:12,note:"Isolate hamstrings. Controls patellar tendon load.",inj:"knee",opt:true},
+      {n:"Nordic Curl (assisted)",s:2,r:"4-6",note:"Eccentric loading at a long muscle length — the best-evidenced exercise in this program for both hamstring flexibility and strain-injury resilience. Directly serves the front split, not just leg day.",inj:"knee",core:true},
+      {n:"Leg Extension (light)",s:2,r:15,note:"Second weekly quad touch — frequency matters as much as volume for growth, and quads only get one direct day otherwise.",inj:"knee",opt:true},
+      {n:"Calf Raise (standing)",s:3,r:20,note:"Tight calves worsen patella pain. Stretch at bottom.",inj:"foot",core:true},
     ],mg:["glutes","hamstrings","quads","calves","core"]},
     {day:"Day C",label:"Upper - Back Width",focus:"Build the V-taper. Upper back thickness. Wide and intimidating.",
     warmup:[
@@ -201,15 +218,15 @@ const WO=[
       {n:"Straight-Arm Pulldown (light)",r:"2x15",note:"Activates lats in isolation before compound pulling.",nw:true},
       {n:"Prone Y-T-W",r:"2x8 each",note:"Lie face down, make Y T and W shapes with arms. Activates all scapular stabilizers.",nw:true},
     ],ex:[
-      {n:"Neutral-Grip Pull-Up",s:4,r:"6-10",note:"Neutral grip protects AC joint. Width that looks scary.",inj:"shoulder"},
-      {n:"Seated Cable Row (wide)",s:4,r:12,note:"Trunk muscle LOW. Attack every session.",inj:"none"},
-      {n:"Landmine Row",s:3,r:"10 ea",note:"Shoulder-safe heavy rowing. One arm, explosive pull.",inj:"shoulder"},
-      {n:"DB Lateral Raise",s:4,r:15,note:"Capped delts = big and scary silhouette. Light, strict form.",inj:"shoulder"},
-      {n:"Incline DB Press",s:3,r:12,note:"Second weekly chest touch at a different angle than Day A — frequency matters as much as volume for growth.",inj:"shoulder"},
-      {n:"Hammer Curl",s:3,r:12,note:"Brachialis = arm thickness from all angles.",inj:"none"},
-      {n:"OH Cable Tricep Ext",s:3,r:12,note:"Long head mass. Elbows tight.",inj:"shoulder"},
-      {n:"Ab Wheel Rollout",s:3,r:"8-10",note:"Best core exercise. Hips do not drop.",nw:true,inj:"none"},
-      {n:"Couch Stretch",s:1,r:"60s ea",note:"Front-split maintenance dose on your upper day. Mild stretch tension only, never sharp or pinching pain.",nw:true,inj:"hip"},
+      {n:"Neutral-Grip Pull-Up",s:4,r:"6-10",note:"Neutral grip protects AC joint. Width that looks scary.",inj:"shoulder",core:true},
+      {n:"Seated Cable Row (wide)",s:4,r:12,note:"Trunk muscle LOW. Attack every session.",inj:"none",core:true},
+      {n:"Landmine Row",s:3,r:"10 ea",note:"Shoulder-safe heavy rowing. One arm, explosive pull.",inj:"shoulder",core:true},
+      {n:"DB Lateral Raise",s:4,r:15,note:"Capped delts = big and scary silhouette. Light, strict form.",inj:"shoulder",core:true},
+      {n:"Incline DB Press",s:3,r:12,note:"Second weekly chest touch at a different angle than Day A — frequency matters as much as volume for growth.",inj:"shoulder",opt:true},
+      {n:"Hammer Curl",s:3,r:12,note:"Brachialis = arm thickness from all angles.",inj:"none",opt:true},
+      {n:"OH Cable Tricep Ext",s:3,r:12,note:"Long head mass. Elbows tight.",inj:"shoulder",opt:true},
+      {n:"Ab Wheel Rollout",s:3,r:"8-10",note:"Best core exercise. Hips do not drop.",nw:true,inj:"none",core:true},
+      {n:"Couch Stretch",s:1,r:"60s ea",note:"Front-split maintenance dose on your upper day. Mild stretch tension only, never sharp or pinching pain.",nw:true,inj:"hip",opt:true},
     ],mg:["back","shoulders","chest","biceps","triceps","core"]},
     {day:"Day D",label:"Lower - Quad Focus",focus:"Patella-friendly quads. Hip flexor mobility. Deadlift strength. Front-split progression.",
     warmup:[
@@ -220,14 +237,14 @@ const WO=[
       {n:"Romanian Deadlift (bar only)",r:"2x10",note:"Bar or very light weight. Warms up hamstrings and hip hinge pattern.",nw:true},
       {n:"Ankle + Calf Raise",r:"2x15",note:"Raises then dorsiflexion stretch. Addresses foot chain before loading knees.",nw:true},
     ],ex:[
-      {n:"Couch Stretch",s:2,r:"90s ea",note:"ALWAYS first. Tight hip flexors = root of patellar pain. Also your front-split opener — notice how deep it feels each week. Mild stretch tension only, never sharp or pinching pain.",nw:true,inj:"hip"},
-      {n:"Goblet Squat (slow)",s:4,r:10,note:"Controlled descent, heels elevated if needed.",inj:"knee"},
-      {n:"Deadlift",s:4,r:6,note:"Progressive overload each week. Own this lift.",inj:"none"},
-      {n:"Bulgarian Split Squat",s:3,r:"8 ea",note:"Rear foot elevated reduces knee torque. Slow on descent.",inj:"knee"},
-      {n:"Leg Extension (light)",s:3,r:15,note:"Rehab load only. Strengthen quad tendon insertion.",inj:"knee"},
-      {n:"Copenhagen Plank (knee-supported)",s:2,r:"15s ea",note:"Adductor strength at length — well-evidenced for groin/hip health and complements the front-split work on the other lower day.",inj:"hip"},
-      {n:"Tibialis Raise",s:3,r:20,note:"Fixes tight calves + foot chain from the ground.",nw:true,inj:"foot"},
-      {n:"Plank + Glute Squeeze",s:3,r:"40s",note:"Anterior pelvic tilt fix. Squeeze glutes the whole hold.",nw:true,inj:"none"},
+      {n:"Couch Stretch",s:2,r:"90s ea",note:"ALWAYS first. Tight hip flexors = root of patellar pain. Also your front-split opener — notice how deep it feels each week. Mild stretch tension only, never sharp or pinching pain.",nw:true,inj:"hip",opt:true},
+      {n:"Goblet Squat (slow)",s:4,r:10,note:"Controlled descent, heels elevated if needed.",inj:"knee",core:true},
+      {n:"Deadlift",s:4,r:6,note:"Progressive overload each week. Own this lift.",inj:"none",core:true},
+      {n:"Bulgarian Split Squat",s:3,r:"8 ea",note:"Rear foot elevated reduces knee torque. Slow on descent.",inj:"knee",core:true},
+      {n:"Leg Extension (light)",s:3,r:15,note:"Rehab load only. Strengthen quad tendon insertion.",inj:"knee",opt:true},
+      {n:"Copenhagen Plank (knee-supported)",s:2,r:"15s ea",note:"Adductor strength at length — well-evidenced for groin/hip health and complements the front-split work on the other lower day.",inj:"hip",core:true},
+      {n:"Tibialis Raise",s:3,r:20,note:"Fixes tight calves + foot chain from the ground.",nw:true,inj:"foot",opt:true},
+      {n:"Plank + Glute Squeeze",s:3,r:"40s",note:"Anterior pelvic tilt fix. Squeeze glutes the whole hold.",nw:true,inj:"none",core:true},
     ],mg:["quads","hamstrings","glutes","core"]},
   ],
   [
@@ -240,15 +257,15 @@ const WO=[
       {n:"Push-Up (wide grip)",r:"2x10",note:"Bodyweight pressing pattern. Activates chest and front delts.",nw:true},
       {n:"Face Pull (light)",r:"2x20",note:"Rear delt and upper back balance before heavy pressing.",nw:true},
     ],ex:[
-      {n:"Landmine Press",s:5,r:"8 ea",note:"Add weight every session. Shoulder stays safe.",inj:"shoulder"},
-      {n:"Incline DB Press",s:4,r:10,note:"Upper chest. DBs allow natural rotation - safer than bar.",inj:"shoulder"},
-      {n:"Chest-Supported DB Row",s:5,r:10,note:"Trunk mass LOW. Row heavy every session.",inj:"none"},
-      {n:"Face Pull (cable)",s:4,r:15,note:"Shoulder health. Never skip.",inj:"shoulder"},
-      {n:"End-Range External Rotation Hold",s:2,r:"20s ea",note:"Arm at 90°, rotate to end-range external rotation and hold with light weight. Loaded end-range, not just mid-range band work.",inj:"shoulder"},
-      {n:"Lateral Raise (cable)",s:4,r:15,note:"Cable keeps tension. Delt caps.",inj:"shoulder"},
-      {n:"EZ Bar Curl",s:3,r:10,note:"Sleeve-fillers. Controlled, no swinging.",inj:"none"},
-      {n:"Skull Crusher",s:3,r:10,note:"Tricep mass. Elbows locked in.",inj:"none"},
-      {n:"Couch Stretch",s:1,r:"60s ea",note:"Front-split maintenance dose on your upper day. Mild stretch tension only, never sharp or pinching pain.",inj:"hip",nw:true},
+      {n:"Landmine Press",s:5,r:"8 ea",note:"Add weight every session. Shoulder stays safe.",inj:"shoulder",core:true},
+      {n:"Incline DB Press",s:4,r:10,note:"Upper chest. DBs allow natural rotation - safer than bar.",inj:"shoulder",core:true},
+      {n:"Chest-Supported DB Row",s:5,r:10,note:"Trunk mass LOW. Row heavy every session.",inj:"none",core:true},
+      {n:"Face Pull (cable)",s:4,r:15,note:"Shoulder health. Never skip.",inj:"shoulder",core:true},
+      {n:"End-Range External Rotation Hold",s:2,r:"20s ea",note:"Arm at 90°, rotate to end-range external rotation and hold with light weight. Loaded end-range, not just mid-range band work.",inj:"shoulder",opt:true},
+      {n:"Lateral Raise (cable)",s:4,r:15,note:"Cable keeps tension. Delt caps.",inj:"shoulder",opt:true},
+      {n:"EZ Bar Curl",s:3,r:10,note:"Sleeve-fillers. Controlled, no swinging.",inj:"none",opt:true},
+      {n:"Skull Crusher",s:3,r:10,note:"Tricep mass. Elbows locked in.",inj:"none",core:true},
+      {n:"Couch Stretch",s:1,r:"60s ea",note:"Front-split maintenance dose on your upper day. Mild stretch tension only, never sharp or pinching pain.",inj:"hip",nw:true,opt:true},
     ],mg:["chest","shoulders","back","biceps","triceps"]},
     {day:"Day B",label:"Lower - Deadlift Focus",focus:"Pull heavy. Glute activation. Posterior chain. Front-split progression.",
     warmup:[
@@ -259,15 +276,15 @@ const WO=[
       {n:"Deadlift (50% working weight)",r:"1x5",note:"Build up to working weight. Never skip this.",nw:true},
       {n:"Sumo Stance Hip Circle",r:"10 ea direction",note:"Opens hips for the pull. Critical for your hip tightness.",nw:true},
     ],ex:[
-      {n:"Hip 90/90 + Couch Stretch",s:2,r:"90s ea",note:"Non-negotiable warm-up.",nw:true,inj:"hip"},
-      {n:"Deadlift (heavy)",s:5,r:5,note:"Progressive overload — add load when all sets hit target reps at RIR 1 or less.",inj:"none"},
-      {n:"Active Straight-Leg Raise",s:3,r:"10 ea",note:"Active hamstring flexibility, building range for the front split. Hold the top position 1s. Mild tension only — never force it.",nw:true,inj:"hamstring"},
-      {n:"Hip Thrust (barbell)",s:4,r:10,note:"Heavy. Add 5-10 lbs per week.",inj:"knee"},
-      {n:"Romanian Deadlift",s:4,r:8,note:"Slow eccentric. Load the hamstrings.",inj:"knee"},
-      {n:"Leg Press",s:3,r:15,note:"High foot, controlled descent.",inj:"knee"},
-      {n:"Nordic Curl (assisted)",s:3,r:"4-6",note:"Eccentric loading at a long muscle length — the best-evidenced exercise in this program for both hamstring flexibility and strain-injury resilience. Directly serves the front split, not just leg day.",inj:"knee"},
-      {n:"Leg Extension (light)",s:2,r:15,note:"Second weekly quad touch — frequency matters as much as volume for growth.",inj:"knee"},
-      {n:"Calf + Tibialis Raise",s:3,r:15,note:"Foot and ankle health protocol.",inj:"foot"},
+      {n:"Hip 90/90 + Couch Stretch",s:2,r:"90s ea",note:"Non-negotiable warm-up.",nw:true,inj:"hip",opt:true},
+      {n:"Deadlift (heavy)",s:5,r:5,note:"Progressive overload — add load when all sets hit target reps at RIR 1 or less.",inj:"none",core:true},
+      {n:"Active Straight-Leg Raise",s:3,r:"10 ea",note:"Active hamstring flexibility, building range for the front split. Hold the top position 1s. Mild tension only — never force it.",nw:true,inj:"hamstring",opt:true},
+      {n:"Hip Thrust (barbell)",s:4,r:10,note:"Heavy. Add 5-10 lbs per week.",inj:"knee",core:true},
+      {n:"Romanian Deadlift",s:4,r:8,note:"Slow eccentric. Load the hamstrings.",inj:"knee",core:true},
+      {n:"Leg Press",s:3,r:15,note:"High foot, controlled descent.",inj:"knee",core:true},
+      {n:"Nordic Curl (assisted)",s:3,r:"4-6",note:"Eccentric loading at a long muscle length — the best-evidenced exercise in this program for both hamstring flexibility and strain-injury resilience. Directly serves the front split, not just leg day.",inj:"knee",core:true},
+      {n:"Leg Extension (light)",s:2,r:15,note:"Second weekly quad touch — frequency matters as much as volume for growth.",inj:"knee",opt:true},
+      {n:"Calf + Tibialis Raise",s:3,r:15,note:"Foot and ankle health protocol.",inj:"foot",opt:true},
     ],mg:["hamstrings","glutes","quads","calves"]},
     {day:"Day C",label:"Upper - Back Thickness",focus:"Build the trunk. Wide back. Intimidating physique.",
     warmup:[
@@ -278,15 +295,15 @@ const WO=[
       {n:"External Rotation (band)",r:"2x15 ea",note:"Protects AC joint before heavy pulling.",nw:true},
       {n:"Straight-Arm Pulldown (light)",r:"2x15",note:"Isolates lats. Feel the contraction before loading.",nw:true},
     ],ex:[
-      {n:"Weighted Pull-Up",s:5,r:"5-8",note:"Add weight. Neutral grip.",inj:"shoulder"},
-      {n:"Pendlay Row",s:4,r:8,note:"Explosive pull. Trunk mass. Your weak point - attack it.",inj:"none"},
-      {n:"Seated Cable Row (close)",s:4,r:10,note:"Full stretch at front. Squeeze hard at back.",inj:"none"},
-      {n:"DB Shoulder Press (neutral)",s:4,r:10,note:"Neutral grip protects AC. Shoulder mass.",inj:"shoulder"},
-      {n:"DB Floor Press",s:3,r:12,note:"Second weekly chest touch at a different angle than Day A — frequency matters as much as volume for growth.",inj:"shoulder"},
-      {n:"Rear Delt Fly (cable)",s:4,r:15,note:"Posture and width.",inj:"shoulder"},
-      {n:"Incline DB Curl",s:3,r:10,note:"Long head peak.",inj:"none"},
-      {n:"Tricep Dip",s:3,r:10,note:"Compound tricep mass.",inj:"shoulder"},
-      {n:"Couch Stretch",s:1,r:"60s ea",note:"Front-split maintenance dose on your upper day. Mild stretch tension only, never sharp or pinching pain.",nw:true,inj:"hip"},
+      {n:"Weighted Pull-Up",s:5,r:"5-8",note:"Add weight. Neutral grip.",inj:"shoulder",core:true},
+      {n:"Pendlay Row",s:4,r:8,note:"Explosive pull. Trunk mass. Your weak point - attack it.",inj:"none",core:true},
+      {n:"Seated Cable Row (close)",s:4,r:10,note:"Full stretch at front. Squeeze hard at back.",inj:"none",core:true},
+      {n:"DB Shoulder Press (neutral)",s:4,r:10,note:"Neutral grip protects AC. Shoulder mass.",inj:"shoulder",core:true},
+      {n:"DB Floor Press",s:3,r:12,note:"Second weekly chest touch at a different angle than Day A — frequency matters as much as volume for growth.",inj:"shoulder",opt:true},
+      {n:"Rear Delt Fly (cable)",s:4,r:15,note:"Posture and width.",inj:"shoulder",opt:true},
+      {n:"Incline DB Curl",s:3,r:10,note:"Long head peak.",inj:"none",opt:true},
+      {n:"Tricep Dip",s:3,r:10,note:"Compound tricep mass.",inj:"shoulder",core:true},
+      {n:"Couch Stretch",s:1,r:"60s ea",note:"Front-split maintenance dose on your upper day. Mild stretch tension only, never sharp or pinching pain.",nw:true,inj:"hip",opt:true},
     ],mg:["back","shoulders","chest","biceps","triceps"]},
     {day:"Day D",label:"Lower - Squat Strength",focus:"Build the squat. Hip and knee rehab maintained. Front-split progression.",
     warmup:[
@@ -297,15 +314,15 @@ const WO=[
       {n:"Back Squat (50% working weight)",r:"1x5",note:"Build to working weight. Essential for knee prep.",nw:true},
       {n:"Single Leg Glute Bridge",r:"2x10 ea",note:"Activates glutes unilaterally. Protects knees during heavy squats.",nw:true},
     ],ex:[
-      {n:"Hip Flexor + Calf Mobility",s:2,r:"90s ea",note:"Always. Patellar tendinitis lives in tight hips.",nw:true,inj:"hip"},
-      {n:"Back Squat",s:5,r:5,note:"Progressive overload. Controlled descent.",inj:"knee"},
-      {n:"End-Range Split Hold (PAILs/RAILs)",s:2,r:"3x(10s+10s) ea",note:"Deepest comfortable half-kneeling lunge. PAILs: gently contract the stretched muscles against the floor/front leg for 10s. RAILs: release and actively pull 10s deeper using your own muscles, no assistance. Repeat 3x per side. This converts passive range into range you can actually use — stronger stimulus than a plain hold. Mild tension only.",nw:true,inj:"hip"},
-      {n:"Copenhagen Plank (knee-supported)",s:2,r:"15s ea",note:"Adductor strength at length — well-evidenced for groin/hip health, complements the front-split work above.",inj:"hip"},
-      {n:"Bulgarian Split Squat (DB)",s:4,r:"8 ea",note:"Slow negative. Single-leg strength.",inj:"knee"},
-      {n:"Hip Thrust",s:4,r:10,note:"Heaviest you have done. Glutes are the engine.",inj:"knee"},
-      {n:"Leg Extension (moderate)",s:3,r:15,note:"Progress weight slowly.",inj:"knee"},
-      {n:"Farmer's Carry",s:4,r:"30s",note:"Grip, core, traps. Total body hardness.",inj:"none"},
-      {n:"Ab Wheel Rollout",s:3,r:10,note:"Core density. Low back neutral.",nw:true,inj:"none"},
+      {n:"Hip Flexor + Calf Mobility",s:2,r:"90s ea",note:"Always. Patellar tendinitis lives in tight hips.",nw:true,inj:"hip",opt:true},
+      {n:"Back Squat",s:5,r:5,note:"Progressive overload. Controlled descent.",inj:"knee",core:true},
+      {n:"End-Range Split Hold (PAILs/RAILs)",s:2,r:"3x(10s+10s) ea",note:"Deepest comfortable half-kneeling lunge. PAILs: gently contract the stretched muscles against the floor/front leg for 10s. RAILs: release and actively pull 10s deeper using your own muscles, no assistance. Repeat 3x per side. This converts passive range into range you can actually use — stronger stimulus than a plain hold. Mild tension only.",nw:true,inj:"hip",opt:true},
+      {n:"Copenhagen Plank (knee-supported)",s:2,r:"15s ea",note:"Adductor strength at length — well-evidenced for groin/hip health, complements the front-split work above.",inj:"hip",opt:true},
+      {n:"Bulgarian Split Squat (DB)",s:4,r:"8 ea",note:"Slow negative. Single-leg strength.",inj:"knee",core:true},
+      {n:"Hip Thrust",s:4,r:10,note:"Heaviest you have done. Glutes are the engine.",inj:"knee",core:true},
+      {n:"Leg Extension (moderate)",s:3,r:15,note:"Progress weight slowly.",inj:"knee",opt:true},
+      {n:"Farmer's Carry",s:4,r:"30s",note:"Grip, core, traps. Total body hardness.",inj:"none",core:true},
+      {n:"Ab Wheel Rollout",s:3,r:10,note:"Core density. Low back neutral.",nw:true,inj:"none",core:true},
     ],mg:["quads","glutes","hamstrings","core"]},
   ],
   [
@@ -318,15 +335,15 @@ const WO=[
       {n:"Shoulder Dislocate (band)",r:"2x10",note:"Wide grip on band, pass overhead and behind back. Full shoulder mobility.",nw:true},
       {n:"Push-Up + Row (light DB)",r:"2x8",note:"Combined movement pattern. Primes both push and pull for supersets.",nw:true},
     ],ex:[
-      {n:"Landmine Press SS",s:4,r:"10 ea",note:"Superset with face pulls. 90s rest after pair.",inj:"shoulder"},
-      {n:"Face Pull SS",s:4,r:15,note:"Back-to-back with Landmine Press.",inj:"shoulder"},
-      {n:"Weighted Pull-Up",s:5,r:"6-8",note:"Max weight. Building the final physique.",inj:"shoulder"},
-      {n:"Chest-Supported Row (heavy)",s:5,r:8,note:"Trunk mass - this is the phase it shows.",inj:"none"},
-      {n:"Incline Press + Lat Raise SS",s:4,r:"10/15",note:"Superset. Rest 60s. Chest + delts.",inj:"shoulder"},
-      {n:"End-Range External Rotation Hold",s:2,r:"20s ea",note:"Arm at 90°, rotate to end-range external rotation and hold with light weight. Loaded end-range, not just mid-range band work.",inj:"shoulder"},
-      {n:"Curl/Pushdown Superset",s:4,r:"10/12",note:"Back-to-back. Arms fill the sleeves.",inj:"none"},
-      {n:"Pallof Press + Ab Wheel SS",s:3,r:"10/8",note:"Core density visible now.",nw:true,inj:"none"},
-      {n:"Couch Stretch",s:1,r:"60s ea",note:"Front-split maintenance dose on your upper day. Mild stretch tension only, never sharp or pinching pain.",nw:true,inj:"hip"},
+      {n:"Landmine Press SS",s:4,r:"10 ea",note:"Superset with face pulls. 90s rest after pair.",inj:"shoulder",core:true},
+      {n:"Face Pull SS",s:4,r:15,note:"Back-to-back with Landmine Press.",inj:"shoulder",core:true},
+      {n:"Weighted Pull-Up",s:5,r:"6-8",note:"Max weight. Building the final physique.",inj:"shoulder",core:true},
+      {n:"Chest-Supported Row (heavy)",s:5,r:8,note:"Trunk mass - this is the phase it shows.",inj:"none",core:true},
+      {n:"Incline Press + Lat Raise SS",s:4,r:"10/15",note:"Superset. Rest 60s. Chest + delts.",inj:"shoulder",opt:true},
+      {n:"End-Range External Rotation Hold",s:2,r:"20s ea",note:"Arm at 90°, rotate to end-range external rotation and hold with light weight. Loaded end-range, not just mid-range band work.",inj:"shoulder",opt:true},
+      {n:"Curl/Pushdown Superset",s:4,r:"10/12",note:"Back-to-back. Arms fill the sleeves.",inj:"none",opt:true},
+      {n:"Pallof Press + Ab Wheel SS",s:3,r:"10/8",note:"Core density visible now.",nw:true,inj:"none",core:true},
+      {n:"Couch Stretch",s:1,r:"60s ea",note:"Front-split maintenance dose on your upper day. Mild stretch tension only, never sharp or pinching pain.",nw:true,inj:"hip",opt:true},
     ],mg:["chest","shoulders","back","biceps","triceps","core"]},
     {day:"Day B",label:"Lower - Strength + Conditioning",focus:"Heavy pull. Glute focus. Front-split progression.",
     warmup:[
@@ -337,15 +354,15 @@ const WO=[
       {n:"Deadlift (65% working weight)",r:"1x3",note:"Second build-up. Near working weight now.",nw:true},
       {n:"KB Swing (light)",r:"2x10",note:"Hip hinge explosiveness primer. Glutes fire before the big pull.",nw:true},
     ],ex:[
-      {n:"Full Mobility Protocol",s:1,r:"5 min",note:"90/90, couch stretch, calf stretch, ankle circles.",nw:true,inj:"hip"},
-      {n:"Deadlift (near max)",s:5,r:"3-5",note:"Push toward a new top set. The big pull.",inj:"none"},
-      {n:"Active Straight-Leg Raise",s:3,r:"10 ea",note:"Hold 2s at the top. End-range control for the front split. Mild tension only — never force it.",nw:true,inj:"hamstring"},
-      {n:"Hip Thrust (max load)",s:5,r:8,note:"Heaviest you have done. Glutes are the engine.",inj:"knee"},
-      {n:"Romanian Deadlift",s:4,r:8,note:"Hamstring density. Slow and loaded.",inj:"knee"},
-      {n:"Walking Lunge (DBs)",s:3,r:"10 ea",note:"Forward lunge - less patellar stress.",inj:"knee"},
-      {n:"Nordic Curl (assisted)",s:3,r:"4-6",note:"Eccentric loading at a long muscle length — the best-evidenced exercise in this program for both hamstring flexibility and strain-injury resilience. Directly serves the front split, not just leg day.",inj:"knee"},
-      {n:"Leg Extension (light)",s:2,r:15,note:"Second weekly quad touch, low systemic fatigue. The metabolic finisher moved to your dedicated VO2max days — this phase doesn't need both.",inj:"knee"},
-      {n:"Tibialis + Calf Protocol",s:3,r:20,note:"End every lower session with this.",inj:"foot"},
+      {n:"Full Mobility Protocol",s:1,r:"5 min",note:"90/90, couch stretch, calf stretch, ankle circles.",nw:true,inj:"hip",opt:true},
+      {n:"Deadlift (near max)",s:5,r:"3-5",note:"Push toward a new top set. The big pull.",inj:"none",core:true},
+      {n:"Active Straight-Leg Raise",s:3,r:"10 ea",note:"Hold 2s at the top. End-range control for the front split. Mild tension only — never force it.",nw:true,inj:"hamstring",opt:true},
+      {n:"Hip Thrust (max load)",s:5,r:8,note:"Heaviest you have done. Glutes are the engine.",inj:"knee",core:true},
+      {n:"Romanian Deadlift",s:4,r:8,note:"Hamstring density. Slow and loaded.",inj:"knee",core:true},
+      {n:"Walking Lunge (DBs)",s:3,r:"10 ea",note:"Forward lunge - less patellar stress.",inj:"knee",core:true},
+      {n:"Nordic Curl (assisted)",s:3,r:"4-6",note:"Eccentric loading at a long muscle length — the best-evidenced exercise in this program for both hamstring flexibility and strain-injury resilience. Directly serves the front split, not just leg day.",inj:"knee",opt:true},
+      {n:"Leg Extension (light)",s:2,r:15,note:"Second weekly quad touch, low systemic fatigue. The metabolic finisher moved to your dedicated VO2max days — this phase doesn't need both.",inj:"knee",opt:true},
+      {n:"Tibialis + Calf Protocol",s:3,r:20,note:"End every lower session with this.",inj:"foot",core:true},
     ],mg:["hamstrings","glutes","quads","calves"]},
     {day:"Day C",label:"Upper - Width & Detail",focus:"Wide back. Capped delts. Visible separation.",
     warmup:[
@@ -356,17 +373,17 @@ const WO=[
       {n:"Light Lat Pulldown",r:"2x15",note:"Feel the lat insertion. Groove the path before cluster sets.",nw:true},
       {n:"Face Pull (light)",r:"2x20",note:"AC joint protection. Phase 3 volume is high - protect the shoulder.",nw:true},
     ],ex:[
-      {n:"Pull-Up Cluster Sets",s:5,r:"3-3-3",note:"15s between clusters. More volume, more strength.",inj:"shoulder"},
-      {n:"Pendlay Row (heavy)",s:5,r:6,note:"Explosive. Trunk thickness. Attack it.",inj:"none"},
-      {n:"Cable Row (long pull)",s:4,r:10,note:"Full stretch, drive elbows hard.",inj:"none"},
-      {n:"Lateral Raise 21s",s:4,r:"7+7+7",note:"7 bottom, 7 top, 7 full. Deltoid burn.",inj:"shoulder"},
-      {n:"DB Floor Press",s:3,r:12,note:"Second weekly chest touch at a different angle than Day A — frequency matters as much as volume for growth.",inj:"shoulder"},
-      {n:"Rear Delt + Face Pull SS",s:4,r:"12+15",note:"Superset. Back of a scary physique.",inj:"shoulder"},
-      {n:"Arm Finisher SS",s:3,r:"10 ea",note:"Curl + pushdown superset. Maximum pump.",inj:"none"},
-      {n:"Dead Bug + Pallof SS",s:3,r:"8+10",note:"Final phase core density.",nw:true,inj:"none"},
-      {n:"Couch Stretch",s:1,r:"60s ea",note:"Front-split maintenance dose on your upper day. Mild stretch tension only, never sharp or pinching pain.",nw:true,inj:"hip"},
+      {n:"Pull-Up Cluster Sets",s:5,r:"3-3-3",note:"15s between clusters. More volume, more strength.",inj:"shoulder",core:true},
+      {n:"Pendlay Row (heavy)",s:5,r:6,note:"Explosive. Trunk thickness. Attack it.",inj:"none",core:true},
+      {n:"Cable Row (long pull)",s:4,r:10,note:"Full stretch, drive elbows hard.",inj:"none",core:true},
+      {n:"Lateral Raise 21s",s:4,r:"7+7+7",note:"7 bottom, 7 top, 7 full. Deltoid burn.",inj:"shoulder",core:true},
+      {n:"DB Floor Press",s:3,r:12,note:"Second weekly chest touch at a different angle than Day A — frequency matters as much as volume for growth.",inj:"shoulder",opt:true},
+      {n:"Rear Delt + Face Pull SS",s:4,r:"12+15",note:"Superset. Back of a scary physique.",inj:"shoulder",opt:true},
+      {n:"Arm Finisher SS",s:3,r:"10 ea",note:"Curl + pushdown superset. Maximum pump.",inj:"none",core:true},
+      {n:"Dead Bug + Pallof SS",s:3,r:"8+10",note:"Final phase core density.",nw:true,inj:"none",opt:true},
+      {n:"Couch Stretch",s:1,r:"60s ea",note:"Front-split maintenance dose on your upper day. Mild stretch tension only, never sharp or pinching pain.",nw:true,inj:"hip",opt:true},
     ],mg:["back","shoulders","chest","biceps","triceps","core"]},
-    {day:"Day D",label:"Lower - Final Shred",focus:"Heavy squat. Look like you lift. Front-split progression.",
+    {day:"Day D",label:"Lower - Final Recomp",focus:"Heavy squat. Look like you lift. Front-split progression.",
     warmup:[
       {n:"Banded Squat Walk",r:"2x15 steps ea",note:"More activation in Phase 3. Glute med firing hard.",nw:true},
       {n:"Quad Foam Roll + IT Band",r:"2 min",note:"Phase 3 volume is highest - quads need this.",nw:true},
@@ -375,14 +392,14 @@ const WO=[
       {n:"Back Squat (65% working weight)",r:"1x4",note:"Second build-up. You should feel ready.",nw:true},
       {n:"Jump Squat (bodyweight)",r:"2x8",note:"CNS activation before heavy squats. Primes fast-twitch fibers.",nw:true},
     ],ex:[
-      {n:"Mobility + Activation",s:1,r:"5 min",note:"Hip flexors, quads, calves. Do not skip.",nw:true,inj:"hip"},
-      {n:"Back Squat (heavy)",s:5,r:5,note:"Final phase. Push the numbers. You have earned it.",inj:"knee"},
-      {n:"Couch Stretch - Front Foot Elevated (PAILs/RAILs)",s:2,r:"3x(10s+10s) ea",note:"Deeper hip extension than the standard couch stretch. PAILs: gently contract the hip flexor into the stretch for 10s. RAILs: release and actively drive the hip deeper for 10s, no assistance. Repeat 3x per side. 8 weeks of work behind this — this is the most advanced version of it. Mild tension only.",nw:true,inj:"hip"},
-      {n:"Copenhagen Plank (knee-supported)",s:2,r:"20s ea",note:"Adductor strength at length — well-evidenced for groin/hip health, complements the front-split work above.",inj:"hip"},
-      {n:"Hip Thrust + RDL SS",s:4,r:"10+8",note:"Posterior chain superset. 90s between pairs.",inj:"knee"},
-      {n:"Bulgarian Split Squat",s:4,r:"8 ea",note:"Final phase - add weight.",inj:"knee"},
-      {n:"Leg Press (drop set)",s:4,r:12,note:"Last set = drop set. Strip weight, go again.",inj:"knee"},
-      {n:"Farmer's Carry",s:4,r:"40s",note:"Heavy DBs. Walk. This is what hardness looks like. The metabolic finisher moved to your dedicated VO2max days — this phase doesn't need both.",inj:"none"},
+      {n:"Mobility + Activation",s:1,r:"5 min",note:"Hip flexors, quads, calves. Do not skip.",nw:true,inj:"hip",opt:true},
+      {n:"Back Squat (heavy)",s:5,r:5,note:"Final phase. Push the numbers. You have earned it.",inj:"knee",core:true},
+      {n:"Couch Stretch - Front Foot Elevated (PAILs/RAILs)",s:2,r:"3x(10s+10s) ea",note:"Deeper hip extension than the standard couch stretch. PAILs: gently contract the hip flexor into the stretch for 10s. RAILs: release and actively drive the hip deeper for 10s, no assistance. Repeat 3x per side. 8 weeks of work behind this — this is the most advanced version of it. Mild tension only.",nw:true,inj:"hip",opt:true},
+      {n:"Copenhagen Plank (knee-supported)",s:2,r:"20s ea",note:"Adductor strength at length — well-evidenced for groin/hip health, complements the front-split work above.",inj:"hip",opt:true},
+      {n:"Hip Thrust + RDL SS",s:4,r:"10+8",note:"Posterior chain superset. 90s between pairs.",inj:"knee",core:true},
+      {n:"Bulgarian Split Squat",s:4,r:"8 ea",note:"Final phase - add weight.",inj:"knee",core:true},
+      {n:"Leg Press (drop set)",s:4,r:12,note:"Last set = drop set. Strip weight, go again.",inj:"knee",core:true},
+      {n:"Farmer's Carry",s:4,r:"40s",note:"Heavy DBs. Walk. This is what hardness looks like. The metabolic finisher moved to your dedicated VO2max days — this phase doesn't need both.",inj:"none",core:true},
     ],mg:["quads","glutes","hamstrings","core"]},
   ],
 ];
@@ -435,7 +452,7 @@ const CONDITIONING=[
      cooldown:"5 min easy pace."},
   ],
   [ // Phase 3 (wk 9-12): hold volume steady — this is not the phase to add more stress
-    {id:"norwegian_4x4",title:"Norwegian 4x4 Intervals",focus:"Same protocol as Phase 2, held steady on purpose — you're in a deeper deficit and lifting near-max this phase. This is not the phase to add more stress.",
+    {id:"norwegian_4x4",title:"Norwegian 4x4 Intervals",focus:"Same protocol as Phase 2, held steady on purpose — you're recomping and lifting near-max this phase. This is not the phase to add more stress.",
      warmup:[{n:"Easy spin / walk + 2 build-ups",r:"8 min",note:"Gradually raise heart rate, finish with 2 short pickups.",nw:true}],
      steps:[
        {label:"Interval 1",dur:240,note:"~90-95% max heart rate."},
@@ -493,12 +510,6 @@ const MEALS=[
           "xs": true
         }
       ],
-      "supps": [
-        "Perfect Pack AM",
-        "Liver Health",
-        "Rhodiola",
-        "Lion's Mane"
-      ],
       "note": "One whey scoop today, right after training — the one spot fast-digesting protein actually matters. Everything else is whole food."
     },
     "lunch": {
@@ -513,11 +524,6 @@ const MEALS=[
           "f": 13,
           "xs": false
         }
-      ],
-      "supps": [
-        "CLA x2",
-        "Turmeric",
-        "Liver Health 2nd dose"
       ],
       "note": "Biggest protein meal of the day — all whole food."
     },
@@ -560,12 +566,6 @@ const MEALS=[
           "f": 3,
           "xs": false
         }
-      ],
-      "supps": [
-        "CLA x2",
-        "Turmeric",
-        "Vision Health",
-        "Perfect Pack PM"
       ],
       "note": "Spread across 4 smaller sittings on purpose — steadier digestion and appetite than 2 big meals."
     }
@@ -575,8 +575,8 @@ const MEALS=[
     "dt": "rest",
     "cal": 2513,
     "p": 197,
-    "c": 246,
-    "f": 85,
+    "c": 247,
+    "f": 86,
     "bkfst": {
       "time": "7:00 AM",
       "items": [
@@ -589,12 +589,6 @@ const MEALS=[
           "f": 21,
           "xs": false
         }
-      ],
-      "supps": [
-        "Perfect Pack AM",
-        "Liver Health",
-        "Rhodiola",
-        "Lion's Mane"
       ],
       "note": "Rest day, not a fuel-light day — full breakfast, not a shake."
     },
@@ -619,11 +613,6 @@ const MEALS=[
           "f": 23,
           "xs": false
         }
-      ],
-      "supps": [
-        "CLA x2",
-        "Turmeric",
-        "Liver Health 2nd dose"
       ],
       "note": "Carbs stay real on rest days now — you may have a VO2max session this day. Zero whey today."
     },
@@ -657,12 +646,6 @@ const MEALS=[
           "f": 3,
           "xs": false
         }
-      ],
-      "supps": [
-        "CLA x2",
-        "Turmeric",
-        "Vision Health",
-        "Perfect Pack PM"
       ],
       "note": "Red meat covers iron, zinc, and natural creatine. 100% whole-food protein today."
     }
@@ -705,12 +688,6 @@ const MEALS=[
           "xs": true
         }
       ],
-      "supps": [
-        "Perfect Pack AM",
-        "Liver Health",
-        "Rhodiola",
-        "Lion's Mane"
-      ],
       "note": "One whey scoop today, right after training — the one spot fast-digesting protein actually matters. Everything else is whole food."
     },
     "lunch": {
@@ -725,11 +702,6 @@ const MEALS=[
           "f": 13,
           "xs": false
         }
-      ],
-      "supps": [
-        "CLA x2",
-        "Turmeric",
-        "Liver Health 2nd dose"
       ],
       "note": "Biggest protein meal of the day — all whole food."
     },
@@ -773,12 +745,6 @@ const MEALS=[
           "xs": false
         }
       ],
-      "supps": [
-        "CLA x2",
-        "Turmeric",
-        "Vision Health",
-        "Perfect Pack PM"
-      ],
       "note": "Spread across 4 smaller sittings on purpose — steadier digestion and appetite than 2 big meals."
     }
   },
@@ -787,8 +753,8 @@ const MEALS=[
     "dt": "rest",
     "cal": 2513,
     "p": 197,
-    "c": 246,
-    "f": 85,
+    "c": 247,
+    "f": 86,
     "bkfst": {
       "time": "7:00 AM",
       "items": [
@@ -801,12 +767,6 @@ const MEALS=[
           "f": 21,
           "xs": false
         }
-      ],
-      "supps": [
-        "Perfect Pack AM",
-        "Liver Health",
-        "Rhodiola",
-        "Lion's Mane"
       ],
       "note": "Rest day, not a fuel-light day — full breakfast, not a shake."
     },
@@ -831,11 +791,6 @@ const MEALS=[
           "f": 23,
           "xs": false
         }
-      ],
-      "supps": [
-        "CLA x2",
-        "Turmeric",
-        "Liver Health 2nd dose"
       ],
       "note": "Carbs stay real on rest days now — you may have a VO2max session this day. Zero whey today."
     },
@@ -869,12 +824,6 @@ const MEALS=[
           "f": 3,
           "xs": false
         }
-      ],
-      "supps": [
-        "CLA x2",
-        "Turmeric",
-        "Vision Health",
-        "Perfect Pack PM"
       ],
       "note": "Red meat covers iron, zinc, and natural creatine. 100% whole-food protein today."
     }
@@ -917,12 +866,6 @@ const MEALS=[
           "xs": true
         }
       ],
-      "supps": [
-        "Perfect Pack AM",
-        "Liver Health",
-        "Rhodiola",
-        "Lion's Mane"
-      ],
       "note": "One whey scoop today, right after training — the one spot fast-digesting protein actually matters. Everything else is whole food."
     },
     "lunch": {
@@ -937,11 +880,6 @@ const MEALS=[
           "f": 13,
           "xs": false
         }
-      ],
-      "supps": [
-        "CLA x2",
-        "Turmeric",
-        "Liver Health 2nd dose"
       ],
       "note": "Biggest protein meal of the day — all whole food."
     },
@@ -985,12 +923,6 @@ const MEALS=[
           "xs": false
         }
       ],
-      "supps": [
-        "CLA x2",
-        "Turmeric",
-        "Vision Health",
-        "Perfect Pack PM"
-      ],
       "note": "Spread across 4 smaller sittings on purpose — steadier digestion and appetite than 2 big meals."
     }
   },
@@ -999,8 +931,8 @@ const MEALS=[
     "dt": "rest",
     "cal": 2513,
     "p": 197,
-    "c": 246,
-    "f": 85,
+    "c": 247,
+    "f": 86,
     "bkfst": {
       "time": "7:00 AM",
       "items": [
@@ -1013,12 +945,6 @@ const MEALS=[
           "f": 21,
           "xs": false
         }
-      ],
-      "supps": [
-        "Perfect Pack AM",
-        "Liver Health",
-        "Rhodiola",
-        "Lion's Mane"
       ],
       "note": "Rest day, not a fuel-light day — full breakfast, not a shake."
     },
@@ -1043,11 +969,6 @@ const MEALS=[
           "f": 23,
           "xs": false
         }
-      ],
-      "supps": [
-        "CLA x2",
-        "Turmeric",
-        "Liver Health 2nd dose"
       ],
       "note": "Carbs stay real on rest days now — you may have a VO2max session this day. Zero whey today."
     },
@@ -1081,12 +1002,6 @@ const MEALS=[
           "f": 3,
           "xs": false
         }
-      ],
-      "supps": [
-        "CLA x2",
-        "Turmeric",
-        "Vision Health",
-        "Perfect Pack PM"
       ],
       "note": "Red meat covers iron, zinc, and natural creatine. 100% whole-food protein today."
     }
@@ -1108,7 +1023,7 @@ const DAILY_SUPPS = [
   {id:"cla_dinner",   name:"CLA x2 softgels",         time:"Dinner",   cat:"nut",    trainOnly:false, note:"With dinner. Needs dietary fat."},
   {id:"vision",       name:"Vision Health",           time:"Dinner",   cat:"nut",    trainOnly:false, note:"With dinner. Fat-soluble - needs this meal."},
   {id:"perfectpm",    name:"Perfect Pack PM",          time:"Dinner",   cat:"nut",    trainOnly:false, note:"PM packet with dinner."},
-  {id:"nightpro",     name:"XS Grass Fed Whey (night)",time:"9:30 PM", cat:"xs",     trainOnly:false, note:"Every single night. Protects muscle during short sleep."},
+  {id:"nightpro",     name:"Cottage Cheese (Night Protein)",time:"9:30 PM", cat:"nut",    trainOnly:false, note:"3/4 cup cottage cheese \u2014 real casein, digests slow overnight. Better suited to this slot than another whey scoop."},
 ];
 
 // ── MOBILITY ───────────────────────────────────────────────────────────────
@@ -1154,10 +1069,10 @@ const MOBILITY_LIBRARY=[
           {label:"Slow nasal breathing",dur:180,note:"Exhale longer than you inhale."}]},
   {id:"restore_joints",domain:"restore",title:"Full-Body Joint Prep",time:"4 min",tags:["stiffness","general"],
    body:"Circles through every major joint. A good first thing in the morning or before any session.",
-   steps:[{label:"Neck circles",dur:30,note:"Slow, both directions."},
-          {label:"Shoulder rolls",dur:30,note:"Big circles, forward then back."},
-          {label:"Hip circles",dur:30,note:"Hands on hips, trace a big circle."},
-          {label:"Ankle circles",dur:30,note:"Each foot, both directions."}]},
+   steps:[{label:"Neck circles",dur:60,note:"Slow, both directions."},
+          {label:"Shoulder rolls",dur:60,note:"Big circles, forward then back."},
+          {label:"Hip circles",dur:60,note:"Hands on hips, trace a big circle."},
+          {label:"Ankle circles",dur:60,note:"Each foot, both directions."}]},
   {id:"restore_catcow",domain:"restore",title:"Cat-Cow Flow",time:"2 min",tags:["back","general"],
    body:"Classic spinal flexion/extension flow. Use any day your back feels stiff.",
    steps:[{label:"Cat-Cow",dur:120,note:"On all fours. Round then arch the spine with your breath."}]},
@@ -1301,7 +1216,10 @@ const RestTimer=({onClose})=>{
   return(
     <div style={{position:"fixed",inset:0,zIndex:300,display:"flex",alignItems:"flex-end",background:"rgba(0,0,0,0.9)"}} onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
       <div style={{width:"100%",maxWidth:430,margin:"0 auto",background:C.card,borderRadius:"16px 16px 0 0",padding:"28px 20px calc(48px + env(safe-area-inset-bottom))",borderBottom:"none",textAlign:"center"}}>
-        <p style={{margin:"0 0 20px",fontSize:11,color:C.muted,letterSpacing:"0.25em",textTransform:"uppercase",fontFamily:FC}}>REST TIMER</p>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
+          <p style={{margin:0,fontSize:11,color:C.muted,letterSpacing:"0.25em",textTransform:"uppercase",fontFamily:FC}}>REST TIMER</p>
+          <button onClick={onClose} aria-label="Close rest timer" style={{background:C.surface,border:`1px solid ${C.border}`,borderRadius:8,width:32,height:32,color:C.text,fontSize:16,cursor:"pointer",lineHeight:1}}>✕</button>
+        </div>
         <svg width="130" height="130" viewBox="0 0 130 130" style={{display:"block",margin:"0 auto 20px"}}>
           <circle cx="65" cy="65" r={r} fill="none" stroke={C.border} strokeWidth="6"/>
           <circle cx="65" cy="65" r={r} fill="none" stroke={C.yellow} strokeWidth="6"
@@ -1455,6 +1373,7 @@ const SuppCard=({s,showCaff})=>{
 // ── LOG MODAL (Full Progressive Overload) ─────────────────────────────────
 const LogModal=({ex,pc,lastSets,targets,week,phase,allHistory,onSave,onClose})=>{
   const baseline=!week||week<=1;
+  const deloadWeek=isDeload(week||1);
   const compound=isCompound(ex.n);
   const restSecs=compound?150:60;
   const workSets=(lastSets||[]).filter(s=>!s.isWarmup&&!s.isBurnout);
@@ -1483,7 +1402,7 @@ const LogModal=({ex,pc,lastSets,targets,week,phase,allHistory,onSave,onClose})=>
     setSets(p=>p.map((s,idx)=>idx===i?{...s,logged:true}:s));
     const isLast=i===sets.length-1;
     const label=compound?"2.5 MIN REST":"60s REST";
-    if(isLast&&phase>=1){
+    if(isLast&&phase>=1&&!deloadWeek){
       setRestTimer({secs:180,label:"BURNOUT REST - 3 MIN"});
       setTimerKey(k=>k+1);
     } else {
@@ -1491,7 +1410,7 @@ const LogModal=({ex,pc,lastSets,targets,week,phase,allHistory,onSave,onClose})=>
       setTimerKey(k=>k+1);
       setActiveSet(Math.min(i+1,sets.length-1));
     }
-    if(isLast&&phase>=1){
+    if(isLast&&phase>=1&&!deloadWeek){
       setTimeout(()=>setBurnoutReady(true),180000);
     }
   };
@@ -1541,7 +1460,8 @@ const LogModal=({ex,pc,lastSets,targets,week,phase,allHistory,onSave,onClose})=>
               <span style={{fontSize:9,padding:"2px 8px",borderRadius:4,background:C.surface,color:C.muted,fontFamily:FC}}>
                 {compound?"Compound 2.5min":"Isolation 60s"}
               </span>
-              {phase>=1&&<span style={{fontSize:9,padding:"2px 8px",borderRadius:4,background:C.red+"22",color:C.red,fontFamily:FC}}>BURNOUT</span>}
+              {phase>=1&&!deloadWeek&&<span style={{fontSize:9,padding:"2px 8px",borderRadius:4,background:C.red+"22",color:C.red,fontFamily:FC}}>BURNOUT</span>}
+              {deloadWeek&&<span style={{fontSize:9,padding:"2px 8px",borderRadius:4,background:C.yellow+"22",color:C.yellow,fontFamily:FC}}>DELOAD 60%</span>}
             </div>
           </div>
           <div style={{display:"flex",gap:6,flexShrink:0}}>
@@ -1692,10 +1612,10 @@ const LogModal=({ex,pc,lastSets,targets,week,phase,allHistory,onSave,onClose})=>
         )}
 
         {/* Rest timer */}
-        {restTimer&&<InlineTimer key={timerKey} seconds={restTimer.secs} label={restTimer.label} onDone={()=>{if(phase>=1&&sets.every(s=>s.logged))setBurnoutReady(true);}}/>}
+        {restTimer&&<InlineTimer key={timerKey} seconds={restTimer.secs} label={restTimer.label} onDone={()=>{if(phase>=1&&!deloadWeek&&sets.every(s=>s.logged))setBurnoutReady(true);}}/>}
 
         {/* Burnout section */}
-        {phase>=1&&sets.every(s=>s.logged)&&!showBurnout&&(
+        {phase>=1&&!deloadWeek&&sets.every(s=>s.logged)&&!showBurnout&&(
           <div style={{background:C.red+"22",borderRadius:10,padding:"14px",border:`1px solid ${C.red}66`,marginTop:8}}>
             <p style={{margin:"0 0 4px",fontSize:16,fontWeight:600,fontFamily:FD,color:C.red}}>Burnout Set</p>
             <p style={{margin:"0 0 10px",fontSize:11,color:C.muted,fontFamily:FB,lineHeight:1.5}}>
@@ -1890,6 +1810,7 @@ const LoginScreen = ({onLogin}) => {
                 transition:"all 0.2s"}}>
                 <p style={{margin:0,fontSize:17,fontWeight:600,fontFamily:FD,letterSpacing:"-0.005em",
                 color: selectedUser===p ? C.yellow : C.text}}>{u.name}</p>
+                <p style={{margin:"4px 0 0",fontSize:10,color:C.muted,fontFamily:FB,lineHeight:1.35}}>{u.tagline}</p>
             </button>
           ))}
         </div>
@@ -1928,9 +1849,6 @@ const LoginScreen = ({onLogin}) => {
         </div>
       )}
 
-      <p style={{margin:"24px 0 0",fontSize:10,color:C.dim,fontFamily:FB,textAlign:"center",position:"relative"}}>
-        Andrew: 1111 · Beaudy: 2222
-      </p>
     </div>
   );
 };
@@ -1990,6 +1908,9 @@ const AssessmentFlow=({onComplete,onClose})=>{
             </button>
           ))}
         </div>
+        {step>0&&(
+          <button onClick={()=>setStep(step-1)} style={{marginTop:12,background:"none",border:`1px solid ${C.border}`,borderRadius:8,padding:"9px 14px",fontSize:11,color:C.steel,cursor:"pointer",fontFamily:FC}}>← BACK</button>
+        )}
       </div>
     </div>
   );
@@ -2081,8 +2002,28 @@ function AppInner({pin, user, onLogout}){
   const [ci,setCi]=useState(0);
   const [runningConditioning,setRunningConditioning]=useState(null);
   const [pendingConditioningRPE,setPendingConditioningRPE]=useState(null);
+  const [showOpt,setShowOpt]=useState(false);
+  const [armedSkill,setArmedSkill]=useState(null);
+  const armTimerRef=useRef(null);
+  const [weekMsg,setWeekMsg]=useState("");
+  const [baseForm,setBaseForm]=useState(null);
 
   const persist=useCallback(nd=>{setData(nd);save(nd,pin);},[pin]);
+
+  // Per-user baseline stats: stored data wins, then the USERS default.
+  // Beaudy has no default (needsSetup) until she saves her own baselines.
+  const baseStats=user.stats||null;
+  const myStats=data.stats?{...(baseStats||{}),...data.stats}:baseStats;
+  const needsSetup=!myStats;
+
+  // Seed sensible default goals for a user who has never picked any.
+  // A user who deliberately cleared their goals (goals === []) keeps [].
+  useEffect(()=>{
+    if(data.goals===undefined){
+      persist({...data,goals:["build_muscle","get_stronger","move_better","front_split","vo2max"]});
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[]);
 
   // ── Goals ──────────────────────────────────────────────────────────────
   const goals=data.goals||[];
@@ -2130,6 +2071,25 @@ function AppInner({pin, user, onLogout}){
     if(s.level>=max)return;
     persist({...data,skills:{...skillState,[sid]:{...s,level:s.level+1}}});
   };
+  const regressSkillLevel=(sid)=>{
+    const s=getSkill(sid);
+    if(s.level<=0)return;
+    persist({...data,skills:{...skillState,[sid]:{...s,level:s.level-1}}});
+  };
+  // Two-tap confirm for advancing a skill level: first tap arms the button
+  // for 3 seconds, second tap actually advances. Prevents accidental taps
+  // permanently levelling a skill with no way back.
+  const handleAdvanceSkill=(sk)=>{
+    if(armedSkill!==sk.id){
+      setArmedSkill(sk.id);
+      clearTimeout(armTimerRef.current);
+      armTimerRef.current=setTimeout(()=>setArmedSkill(null),3000);
+      return;
+    }
+    clearTimeout(armTimerRef.current);
+    setArmedSkill(null);
+    advanceSkillLevel(sk.id);
+  };
   const logSkillPractice=(sid)=>{
     const draft=skillLogDraft[sid]||{};
     if(!draft.hold&&!draft.note)return;
@@ -2146,6 +2106,23 @@ function AppInner({pin, user, onLogout}){
   const deload=isDeload(currentWeek);
   const pc=PHASES[ph].color;
   const wo=WO[ph][di];
+  const stepWeek=(delta)=>{
+    const next=Math.max(1,Math.min(12,currentWeek+delta));
+    if(next===currentWeek){
+      setWeekMsg(delta>0?"You're at the current week":"You're at Week 1");
+    } else {
+      setWeekMsg("");
+      persist({...data,weekOverride:next});
+    }
+  };
+  // 60-minute mode: persisted per user, default ON. Core exercises render
+  // first; opt exercises collapse under "IF YOU HAVE TIME".
+  const sixtyMinMode=data.sixtyMinMode!==false;
+  const estMinsFor=(list)=>Math.max(10,Math.round((7+list.reduce((s,e)=>s+(e.s||1)*(isCompound(e.n)?2.2:1.6),0))/5)*5);
+  const condStepDur=(txt,fallback)=>{
+    const m=/(\d+)/.exec(txt||"");
+    return m?parseInt(m[1])*60:(fallback||300);
+  };
 
   // Keys
   const SK2=(p,d,e)=>`p${p}_d${d}_e${e}`;
@@ -2174,7 +2151,7 @@ function AppInner({pin, user, onLogout}){
     persist(nd);
     setLm(null);
     // Check if all exercises done
-    const allDone=WO[ph][di].ex.every((_,i)=>i===ei||!!nd[DK(ph,di,i,currentWeek)]);
+    const allDone=WO[ph][di].ex.every((ex,i)=>(sixtyMinMode&&ex.opt)||i===ei||!!nd[DK(ph,di,i,currentWeek)]);
     if(allDone)setSessionDone(true);
   };
 
@@ -2210,6 +2187,29 @@ function AppInner({pin, user, onLogout}){
     setMWaist("");setMChest("");setMRArm("");setMLArm("");setMShould("");setMNote("");
   };
 
+  // Per-user baselines editor (Track). Saving stores the active user's own
+  // stats under their own key — this is how Beaudy gets her own numbers.
+  const baseVals=baseForm||{
+    weight:myStats?.weight??"",bf:myStats?.bf??"",bfGoal:myStats?.bfGoal??"",muscle:myStats?.muscle??"",
+    benchC:myStats?.prs?.bench.c??"",benchT:myStats?.prs?.bench.t??"",
+    squatC:myStats?.prs?.squat.c??"",squatT:myStats?.prs?.squat.t??"",
+    dlC:myStats?.prs?.deadlift.c??"",dlT:myStats?.prs?.deadlift.t??"",
+    trainCal:myStats?.trainCal??"",restCal:myStats?.restCal??"",
+  };
+  const saveBaselines=()=>{
+    const b=baseVals;
+    const stats={
+      weight:parseFloat(b.weight)||0,bf:parseFloat(b.bf)||0,bfGoal:parseFloat(b.bfGoal)||0,muscle:parseFloat(b.muscle)||0,
+      prs:{bench:{c:parseFloat(b.benchC)||0,t:parseFloat(b.benchT)||0},
+           squat:{c:parseFloat(b.squatC)||0,t:parseFloat(b.squatT)||0},
+           deadlift:{c:parseFloat(b.dlC)||0,t:parseFloat(b.dlT)||0}},
+      trainCal:parseInt(b.trainCal)||0,restCal:parseInt(b.restCal)||0,
+      journey:myStats?.journey||[parseFloat(b.bf)||0,parseFloat(b.bf)||0,parseFloat(b.bf)||0,parseFloat(b.bfGoal)||0],
+    };
+    persist({...data,stats});
+    setBaseForm(null);
+  };
+
   // Export all locally-stored training data as a JSON file, for migrating
   // into the new Supabase-backed platform. Purely additive/read-only:
   // downloads a snapshot, never modifies `data`.
@@ -2228,8 +2228,10 @@ function AppInner({pin, user, onLogout}){
 
   const scans=data.scans||[];
   const lastScan=scans[scans.length-1];
-  const curBF=lastScan?parseFloat(lastScan.bf):11.6;
-  const bfProg=Math.max(0,Math.min(1,(11.6-curBF)/(11.6-8.5)));
+  const bfStart=myStats?myStats.bf:11.6;
+  const bfGoal=myStats?myStats.bfGoal:8.5;
+  const curBF=lastScan&&parseFloat(lastScan.bf)?parseFloat(lastScan.bf):bfStart;
+  const bfProg=myStats?Math.max(0,Math.min(1,(bfStart-curBF)/((bfStart-bfGoal)||1))):0;
 
   // Mobility recommendations: union of assessment priority areas + goal tags.
   // Just a filter over the library, not a separate scoring engine.
@@ -2256,7 +2258,17 @@ function AppInner({pin, user, onLogout}){
   ];
 
   // Meal plan - auto-syncs to current phase
-  const mp=MEALS.find(m=>m.ph===ph&&m.dt===mealDt)||MEALS[0];
+  const mpBase=MEALS.find(m=>m.ph===ph&&m.dt===mealDt)||MEALS[0];
+  // DAILY_SUPPS is the single source of truth for supplements: Fuel derives
+  // each meal's supplement chips from it (grouped by time of day), so Fuel
+  // and Daily can never disagree. Training-only items appear on training
+  // days only, exactly as scheduled.
+  const suppsForMeal=(times)=>DAILY_SUPPS.filter(s=>times.includes(s.time)&&(!s.trainOnly||mealDt==="training")).map(s=>s.name);
+  const mp={...mpBase,
+    cal:myStats?(mealDt==="training"?(myStats.trainCal||mpBase.cal):(myStats.restCal||mpBase.cal)):mpBase.cal,
+    bkfst:{...mpBase.bkfst,supps:suppsForMeal(["5:00 AM","7:15 AM","Breakfast"])},
+    lunch:{...mpBase.lunch,supps:suppsForMeal(["Lunch","Daily"])},
+    dinner:{...mpBase.dinner,supps:suppsForMeal(["Dinner","9:30 PM"])}};
 
   // SUPPS DATA (inline for brevity)
   const SUPPS_XS=[
@@ -2361,12 +2373,21 @@ function AppInner({pin, user, onLogout}){
 
         {/* Glass stat card */}
         <div style={{background:"rgba(255,255,255,0.04)",backdropFilter:"blur(10px)",WebkitBackdropFilter:"blur(10px)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:18,padding:"14px 16px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-          <div>
-            <p style={{margin:"0 0 3px",fontSize:10,letterSpacing:"0.06em",color:C.muted,fontFamily:FB,fontWeight:600}}>BODY FAT</p>
-            <p style={{margin:0,fontSize:21,fontWeight:700,color:C.text,fontFamily:FD,lineHeight:1}}>
-              {curBF.toFixed(1)}<span style={{fontSize:12,color:C.muted,fontWeight:500}}> → 8.5%</span>
-            </p>
-          </div>
+          {needsSetup?(
+            <div>
+              <p style={{margin:"0 0 3px",fontSize:10,letterSpacing:"0.06em",color:C.muted,fontFamily:FB,fontWeight:600}}>BODY FAT</p>
+              <p style={{margin:0,fontSize:13,fontWeight:600,color:C.yellow,fontFamily:FB,lineHeight:1.35}}>
+                Set {user.name}'s baselines in Track to personalize this program.
+              </p>
+            </div>
+          ):(
+            <div>
+              <p style={{margin:"0 0 3px",fontSize:10,letterSpacing:"0.06em",color:C.muted,fontFamily:FB,fontWeight:600}}>BODY FAT</p>
+              <p style={{margin:0,fontSize:21,fontWeight:700,color:C.text,fontFamily:FD,lineHeight:1}}>
+                {curBF.toFixed(1)}<span style={{fontSize:12,color:C.muted,fontWeight:500}}> → {bfGoal.toFixed(1)}%</span>
+              </p>
+            </div>
+          )}
           <svg width="48" height="48" viewBox="0 0 48 48">
             <circle cx="24" cy="24" r="20" fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="5"/>
             <circle cx="24" cy="24" r="20" fill="none" stroke={C.greenBright} strokeWidth="5" strokeLinecap="round"
@@ -2393,13 +2414,14 @@ function AppInner({pin, user, onLogout}){
                   </p>
                 </div>
                 <div style={{display:"flex",gap:6,alignItems:"center"}}>
-                  <button onClick={()=>persist({...data,weekOverride:Math.max(1,currentWeek-1)})}
+                  <button onClick={()=>stepWeek(-1)}
                     style={{width:32,height:32,borderRadius:8,background:C.surface,border:`1px solid ${C.border}`,color:C.text,fontSize:18,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>-</button>
                   <span style={{fontSize:16,fontWeight:"bold",fontFamily:FC,color:pc,minWidth:24,textAlign:"center"}}>{currentWeek}</span>
-                  <button onClick={()=>persist({...data,weekOverride:Math.min(12,currentWeek+1)})}
+                  <button onClick={()=>stepWeek(1)}
                     style={{width:32,height:32,borderRadius:8,background:C.surface,border:`1px solid ${C.border}`,color:C.text,fontSize:18,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>+</button>
                 </div>
               </div>
+              {weekMsg&&<p style={{margin:"0 0 8px",fontSize:11,color:C.yellow,fontFamily:FB}}>{weekMsg}</p>}
               {deload?(
                 <div style={{background:C.yellow+"22",borderRadius:8,padding:"8px 10px",border:`1px solid ${C.yellow}44`}}>
                   <p style={{margin:0,fontSize:11,color:C.yellow,fontFamily:FB,lineHeight:1.5}}>
@@ -2440,6 +2462,18 @@ function AppInner({pin, user, onLogout}){
 
             {trainMode==="lift"&&(<>
 
+            {/* 60-minute mode toggle */}
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:10,background:C.card,borderRadius:12,padding:"10px 14px",marginBottom:10,border:`1px solid ${sixtyMinMode?pc:C.border}`}}>
+              <div style={{flex:1,minWidth:0}}>
+                <p style={{margin:0,fontSize:12,fontFamily:FC,fontWeight:700,color:sixtyMinMode?pc:C.text}}>60 MIN MODE</p>
+                <p style={{margin:0,fontSize:10,color:C.muted,fontFamily:FB,lineHeight:1.4}}>Core work first — extras collapse under “If you have time”. Full day ~{estMinsFor(wo.ex)} min · core ~{estMinsFor(wo.ex.filter(e=>e.core))} min</p>
+              </div>
+              <button onClick={()=>persist({...data,sixtyMinMode:!sixtyMinMode})}
+                style={{flexShrink:0,padding:"8px 16px",borderRadius:20,background:sixtyMinMode?pc:"transparent",color:sixtyMinMode?"#000":C.muted,border:`1px solid ${sixtyMinMode?pc:C.border}`,fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:FC}}>
+                {sixtyMinMode?"ON":"OFF"}
+              </button>
+            </div>
+
             {/* Day tabs */}
             <div style={{display:"flex",gap:6,marginBottom:10}}>
               {WO[ph].map((d,i)=>(
@@ -2471,6 +2505,9 @@ function AppInner({pin, user, onLogout}){
                 <p style={{margin:0,fontSize:10,color:C.muted,letterSpacing:"0.1em",textTransform:"uppercase",fontFamily:FB,fontWeight:600}}>{PHASES[ph].sub} · {wo.day}</p>
                 <p style={{margin:"5px 0 4px",fontSize:20,fontFamily:FD,fontWeight:600,letterSpacing:"-0.01em",color:C.text}}>{wo.label}</p>
                 <p style={{margin:0,fontSize:11,color:C.steel,fontFamily:FB,lineHeight:1.5}}>{wo.focus}</p>
+                <p style={{margin:"4px 0 0",fontSize:10,color:C.muted,fontFamily:FC,letterSpacing:"0.08em"}}>
+                  EST. SESSION: ~{estMinsFor(wo.ex)} MIN{sixtyMinMode?` · CORE ONLY ~${estMinsFor(wo.ex.filter(e=>e.core))} MIN`:""}
+                </p>
               </div>
               {/* Warm-up protocol */}
               {wo.warmup&&wo.warmup.length>0&&(
@@ -2518,7 +2555,9 @@ function AppInner({pin, user, onLogout}){
                 );
               })()}
               <div style={{padding:"10px 12px 6px"}}>
-                {wo.ex.map((ex,i)=>{
+                {(sixtyMinMode
+                  ? [...wo.ex.map((ex,oi)=>({ex,i:oi})).filter(x=>x.ex.core),...wo.ex.map((ex,oi)=>({ex,i:oi})).filter(x=>!x.ex.core)]
+                  : wo.ex.map((ex,oi)=>({ex,i:oi}))).map(({ex,i},dispIdx,arr)=>{
                   const done=isDone(i);
                   const sets=getLast(i);
                   const thisWeekSets=data[WK(ph,di,i,currentWeek)]||[];
@@ -2535,8 +2574,24 @@ function AppInner({pin, user, onLogout}){
                     const r=t?calc1RM(t.w,t.r):0;return r>best?r:best;
                   },0);
                   const isPR=rm>0&&prevBest>0&&rm>prevBest;
+                  if(sixtyMinMode&&ex.opt&&!showOpt){
+                    const firstOpt=dispIdx>0&&arr[dispIdx-1].ex.core;
+                    if(!firstOpt)return null;
+                    return(
+                      <button key={i} onClick={()=>setShowOpt(true)}
+                        style={{width:"100%",marginBottom:7,padding:"11px 12px",borderRadius:10,background:C.surface,border:`1px dashed ${C.border}`,color:C.steel,fontSize:11,cursor:"pointer",fontFamily:FC,fontWeight:700,textAlign:"left"}}>
+                        ▸ IF YOU HAVE TIME ({arr.filter(x=>x.ex.opt).length} extra exercises) — TAP TO EXPAND
+                      </button>
+                    );
+                  }
                   return(
                     <div key={i} style={{marginBottom:7}}>
+                      {sixtyMinMode&&ex.opt&&dispIdx>0&&arr[dispIdx-1].ex.core&&(
+                        <button onClick={()=>setShowOpt(false)}
+                          style={{width:"100%",marginBottom:7,padding:"9px 12px",borderRadius:10,background:C.surface,border:`1px dashed ${C.border}`,color:C.steel,fontSize:11,cursor:"pointer",fontFamily:FC,fontWeight:700,textAlign:"left"}}>
+                          ▾ IF YOU HAVE TIME — TAP TO COLLAPSE
+                        </button>
+                      )}
                       <div style={{display:"flex",gap:10,alignItems:"flex-start",padding:"11px 12px",background:done?pc+"18":C.surface,borderRadius:10,border:`1px solid ${done?pc+"44":C.border}`}}>
                         <div style={{width:22,height:22,borderRadius:4,marginTop:1,flexShrink:0,background:done?pc:"transparent",border:`2px solid ${done?pc:C.dim}`,display:"flex",alignItems:"center",justifyContent:"center"}}>
                           {done&&<Ic n="check" sz={12} col="#000"/>}
@@ -2545,6 +2600,7 @@ function AppInner({pin, user, onLogout}){
                           <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
                             <p style={{margin:0,fontSize:14,fontFamily:FC,fontWeight:700,color:done?C.muted:C.text,textDecoration:done?"line-through":"none"}}>{ex.n}</p>
                             {ex.inj&&ex.inj!=="none"&&<span style={{fontSize:9,padding:"2px 5px",borderRadius:4,background:C.yellow+"22",color:C.yellow,fontFamily:FC}}>{ex.inj}</span>}
+                            {deload&&<span style={{fontSize:9,padding:"2px 5px",borderRadius:4,background:C.yellow+"33",color:C.yellow,fontFamily:FC,fontWeight:700}}>DELOAD 60%</span>}
                             {isPR&&<span style={{fontSize:9,padding:"2px 6px",borderRadius:4,background:C.yellow,color:"#000",fontFamily:FC,fontWeight:700}}>PR!</span>}
                           </div>
                           <p style={{margin:"1px 0 0",fontSize:11,color:C.muted,fontFamily:FB}}>{ex.s} sets x {ex.r}{typeof ex.r==="number"?" reps":""}</p>
@@ -2552,7 +2608,7 @@ function AppInner({pin, user, onLogout}){
                           {currentWeek>1&&tgt&&!done&&(
                             <div style={{marginTop:5,background:pc+"11",borderRadius:6,padding:"4px 8px",border:`1px solid ${pc}22`}}>
                               <p style={{margin:0,fontSize:9,color:pc,fontFamily:FC,letterSpacing:"0.1em"}}>
-                                Wk{currentWeek} target: {tgt.w}lb x {tgt.r}{deload?" (DELOAD: "+Math.round(parseFloat(tgt.w)*0.6)+"lb)":""}
+                                Wk{currentWeek} target: {tgt.w}lb x {tgt.r}{deload?" (deload 60% applied)":""}
                               </p>
                             </div>
                           )}
@@ -2643,7 +2699,11 @@ function AppInner({pin, user, onLogout}){
                       <p style={{margin:"10px 0 0",fontSize:11,color:C.muted,fontFamily:FB,fontStyle:"italic"}}>Cooldown: {session.cooldown}</p>
                     </div>
                   </div>
-                  <button onClick={()=>setRunningConditioning(session)}
+                  <button onClick={()=>setRunningConditioning({...session,steps:[
+                      ...session.warmup.map(w=>({label:"Warm-Up — "+w.n,dur:condStepDur(w.r,300),note:w.note||""})),
+                      ...session.steps,
+                      {label:"Cooldown",dur:condStepDur(session.cooldown,300),note:session.cooldown},
+                    ]})}
                     style={{width:"100%",background:C.blueBright,color:"#0A1420",border:"none",borderRadius:14,padding:"14px",fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:FD,letterSpacing:"0.02em",marginBottom:10}}>
                     Start Session
                   </button>
@@ -2677,14 +2737,20 @@ function AppInner({pin, user, onLogout}){
               <p style={{margin:"0 0 12px",fontSize:10,color:C.muted,letterSpacing:"0.1em",textTransform:"uppercase",fontFamily:FB,fontWeight:600}}>
                 Daily Totals · {PHASES[ph].label} · {mealDt==="training"?"Training":"Rest"} Day
               </p>
-              <div style={{display:"flex",gap:8}}>
-                {[["~"+mp.cal,"kcal",C.yellow],["~"+mp.p+"g","protein",C.green],["~"+mp.c+"g","carbs",C.blue],["~"+mp.f+"g","fat",C.steel]].map(([v,l,col])=>(
-                  <div key={l} style={{flex:1,textAlign:"center",background:"rgba(255,255,255,0.03)",borderRadius:12,padding:"10px 4px",border:`1px solid ${col}33`}}>
-                    <p style={{margin:0,fontSize:14,fontWeight:600,fontFamily:FD,color:col}}>{v}</p>
-                    <p style={{margin:0,fontSize:9,color:C.muted,textTransform:"uppercase"}}>{l}</p>
-                  </div>
-                ))}
-              </div>
+              {needsSetup?(
+                <p style={{margin:0,fontSize:12,color:C.yellow,fontFamily:FB,lineHeight:1.5}}>
+                  Set {user.name}'s baselines in Track to personalize these targets. The meals below are the shared template.
+                </p>
+              ):(
+                <div style={{display:"flex",gap:8}}>
+                  {[["~"+mp.cal,"kcal",C.yellow],["~"+mp.p+"g","protein",C.green],["~"+mp.c+"g","carbs",C.blue],["~"+mp.f+"g","fat",C.steel]].map(([v,l,col])=>(
+                    <div key={l} style={{flex:1,textAlign:"center",background:"rgba(255,255,255,0.03)",borderRadius:12,padding:"10px 4px",border:`1px solid ${col}33`}}>
+                      <p style={{margin:0,fontSize:14,fontWeight:600,fontFamily:FD,color:col}}>{v}</p>
+                      <p style={{margin:0,fontSize:9,color:C.muted,textTransform:"uppercase"}}>{l}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
             <MealBlock section={mp.bkfst} title="Breakfast" emoji="d" pc={pc}/>
             <MealBlock section={mp.lunch} title="Lunch" emoji="e" pc={pc}/>
@@ -2809,10 +2875,10 @@ function AppInner({pin, user, onLogout}){
             {/* Mobility reminder */}
             <div style={{background:C.card,borderRadius:12,padding:"12px 14px",border:`1px solid ${C.border}`}}>
               <p style={{margin:"0 0 8px",fontSize:14,fontWeight:600,fontFamily:FD,color:C.yellow}}>Daily Mobility · 10 Min</p>
-              {MOB.filter(m=>m.pri==="CRITICAL").map((m,i)=>(
-                <p key={i} style={{margin:"0 0 5px",fontSize:11,color:C.muted,fontFamily:FB}}><span style={{color:C.red}}>! </span><span style={{color:C.text,fontWeight:"bold"}}>{m.title}</span> - {m.time}</p>
+              {[["Hip 90/90 Stretch","2 min"],["Couch Stretch","2 min"],["Thoracic Foam Roll","2 min"],["Band Shoulder Dislocates","2 min"],["Calf + Soleus","2 min"]].map(([t,tm],i)=>(
+                <p key={i} style={{margin:"0 0 5px",fontSize:11,color:C.muted,fontFamily:FB}}><span style={{color:C.red}}>! </span><span style={{color:C.text,fontWeight:"bold"}}>{t}</span> - {tm}</p>
               ))}
-              <p style={{margin:"8px 0 0",fontSize:10,color:C.muted,fontFamily:FB}}>See Rehab tab for full protocol.</p>
+              <p style={{margin:"8px 0 0",fontSize:10,color:C.muted,fontFamily:FB}}>See Mobility tab for full protocol.</p>
             </div>
           </div>
         )}
@@ -2830,13 +2896,31 @@ function AppInner({pin, user, onLogout}){
               <button onClick={exportData} style={{width:"100%",background:C.yellow,color:"#000",border:"none",borderRadius:8,padding:"12px",fontSize:14,fontWeight:"bold",cursor:"pointer",fontFamily:FC,textTransform:"uppercase",letterSpacing:"0.1em"}}>DOWNLOAD EXPORT FILE</button>
             </div>
 
+            {/* Per-user baselines */}
+            <div style={{background:C.card,borderRadius:12,padding:"14px 16px",marginBottom:12,border:`1px solid ${needsSetup?C.yellow:C.border}`}}>
+              <p style={{margin:"0 0 4px",fontSize:18,fontFamily:FD}}>My Baselines</p>
+              <p style={{margin:"0 0 12px",fontSize:11,color:C.muted,fontFamily:FB,lineHeight:1.5}}>
+                {user.name}'s personal stats. These drive the header body-fat card, PR targets, the BF% journey and Fuel calorie totals. Saved under {user.name}'s own profile only.
+              </p>
+              <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:8}}>
+                {[["Weight (lbs)","weight"],["Body fat %","bf"],["BF goal %","bfGoal"],["Muscle (lbs)","muscle"],["Bench now (lbs)","benchC"],["Bench goal (lbs)","benchT"],["Squat now (lbs)","squatC"],["Squat goal (lbs)","squatT"],["Deadlift now (lbs)","dlC"],["Deadlift goal (lbs)","dlT"],["Training kcal","trainCal"],["Rest kcal","restCal"]].map(([l,k])=>(
+                  <div key={k} style={{flex:"1 1 calc(33% - 8px)",minWidth:90}}>
+                    <p style={{margin:"0 0 3px",fontSize:9,color:C.muted,fontFamily:FC,textTransform:"uppercase"}}>{l}</p>
+                    <input value={baseVals[k]} onChange={e=>setBaseForm({...baseVals,[k]:e.target.value})} type="number"
+                      style={{width:"100%",background:C.surface,border:`1px solid ${C.border}`,borderRadius:8,padding:"8px",color:C.text,fontSize:15,fontFamily:FC,outline:"none",textAlign:"center"}}/>
+                  </div>
+                ))}
+              </div>
+              <button onClick={saveBaselines} style={{width:"100%",background:C.green,color:"#000",border:"none",borderRadius:8,padding:"12px",fontSize:14,fontWeight:"bold",cursor:"pointer",fontFamily:FC,textTransform:"uppercase",letterSpacing:"0.1em"}}>SAVE BASELINES</button>
+            </div>
+
             {/* Weight log */}
             <div style={{background:C.card,borderRadius:12,padding:"14px 16px",marginBottom:12,border:`1px solid ${C.border}`}}>
               <p style={{margin:"0 0 12px",fontSize:18,fontFamily:FD}}>Daily Weight + Sleep</p>
               <div style={{display:"flex",gap:8,marginBottom:8}}>
                 <div style={{flex:1}}>
                   <p style={{margin:"0 0 3px",fontSize:9,color:C.muted,fontFamily:FC,textTransform:"uppercase"}}>Weight (lbs)</p>
-                  <input value={logW} onChange={e=>setLogW(e.target.value)} placeholder="173.5" type="number"
+                  <input value={logW} onChange={e=>setLogW(e.target.value)} placeholder={myStats?String(myStats.weight):""} type="number"
                     style={{width:"100%",background:C.surface,border:`1px solid ${C.border}`,borderRadius:8,padding:"10px",color:C.text,fontSize:18,fontFamily:FC,outline:"none",textAlign:"center"}}/>
                 </div>
                 <div style={{flex:1}}>
@@ -2848,6 +2932,17 @@ function AppInner({pin, user, onLogout}){
               <input value={logN} onChange={e=>setLogN(e.target.value)} placeholder="Energy, notes, how you feel..."
                 style={{width:"100%",background:C.surface,border:`1px solid ${C.border}`,borderRadius:8,padding:"9px 10px",color:C.text,fontSize:13,fontFamily:FB,outline:"none",boxSizing:"border-box",marginBottom:8}}/>
               <button onClick={saveWeight} style={{width:"100%",background:C.yellow,color:"#000",border:"none",borderRadius:8,padding:"12px",fontSize:14,fontWeight:"bold",cursor:"pointer",fontFamily:FC,textTransform:"uppercase",letterSpacing:"0.1em"}}>SAVE</button>
+              {(data.wlog||[]).length>0&&(
+                <div style={{marginTop:12}}>
+                  <p style={{margin:"0 0 4px",fontSize:10,color:C.muted,fontFamily:FC,letterSpacing:"0.12em",textTransform:"uppercase"}}>History</p>
+                  {(data.wlog||[]).slice().reverse().slice(0,10).map((e,i)=>(
+                    <div key={i} style={{display:"flex",justifyContent:"space-between",gap:8,padding:"5px 0",borderBottom:`1px solid ${C.border}33`}}>
+                      <span style={{fontSize:11,color:C.muted,fontFamily:FB}}>{e.date}</span>
+                      <span style={{fontSize:12,fontFamily:FC,textAlign:"right"}}><span style={{color:C.yellow,fontWeight:"bold"}}>{e.w}lbs</span>{e.sleep?` \u00b7 ${e.sleep}h sleep`:""}{e.n?` \u00b7 ${e.n}`:""}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Weight + Sleep chart */}
@@ -2898,7 +2993,7 @@ function AppInner({pin, user, onLogout}){
             <div style={{background:C.card,borderRadius:12,padding:"14px 16px",marginBottom:12,border:`1px solid ${C.border}`}}>
               <p style={{margin:"0 0 12px",fontSize:18,fontFamily:FD}}>Log Hume Scan</p>
               <div style={{display:"flex",gap:8,marginBottom:8}}>
-                {[["Weight","173.5",scanW,setScanW],["BF%","11.6",scanBF,setScanBF],["Muscle","97.9",scanM,setScanM]].map(([l,ph2,v,sv])=>(
+                {[["Weight",myStats?String(myStats.weight):"",scanW,setScanW],["BF%",myStats?String(myStats.bf):"",scanBF,setScanBF],["Muscle",myStats&&myStats.muscle?String(myStats.muscle):"",scanM,setScanM]].map(([l,ph2,v,sv])=>(
                   <div key={l} style={{flex:1}}>
                     <p style={{margin:"0 0 3px",fontSize:9,color:C.muted,fontFamily:FC,textTransform:"uppercase"}}>{l}</p>
                     <input value={v} onChange={e=>sv(e.target.value)} placeholder={ph2} type="number"
@@ -2909,6 +3004,17 @@ function AppInner({pin, user, onLogout}){
               <input value={scanN} onChange={e=>setScanN(e.target.value)} placeholder="Notes: sleep quality, energy, how you feel..."
                 style={{width:"100%",background:C.surface,border:`1px solid ${C.border}`,borderRadius:8,padding:"9px 10px",color:C.text,fontSize:13,fontFamily:FB,outline:"none",boxSizing:"border-box",marginBottom:8}}/>
               <button onClick={saveScan} style={{width:"100%",background:C.yellow,color:"#000",border:"none",borderRadius:8,padding:"12px",fontSize:14,fontWeight:"bold",cursor:"pointer",fontFamily:FC,textTransform:"uppercase",letterSpacing:"0.1em"}}>SAVE SCAN</button>
+              {scans.length>0&&(
+                <div style={{marginTop:12}}>
+                  <p style={{margin:"0 0 4px",fontSize:10,color:C.muted,fontFamily:FC,letterSpacing:"0.12em",textTransform:"uppercase"}}>History</p>
+                  {scans.slice().reverse().slice(0,10).map((s,i)=>(
+                    <div key={i} style={{display:"flex",justifyContent:"space-between",gap:8,padding:"5px 0",borderBottom:`1px solid ${C.border}33`}}>
+                      <span style={{fontSize:11,color:C.muted,fontFamily:FB}}>{s.date}</span>
+                      <span style={{fontSize:12,fontFamily:FC}}><span style={{color:C.yellow,fontWeight:"bold"}}>{s.w||"-"}lbs</span>{s.bf?` \u00b7 ${s.bf}% BF`:""}{s.m?` \u00b7 ${s.m} muscle`:""}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Body measurements */}
@@ -2933,7 +3039,7 @@ function AppInner({pin, user, onLogout}){
             {(data.measurements||[]).length>0&&(
               <div style={{background:C.card,borderRadius:12,padding:"14px 16px",marginBottom:12,border:`1px solid ${C.border}`}}>
                 <p style={{margin:"0 0 12px",fontSize:16,fontFamily:FD}}>Measurement History</p>
-                {(data.measurements||[]).slice().reverse().map((m,i)=>(
+                {(data.measurements||[]).slice().reverse().slice(0,10).map((m,i)=>(
                   <div key={i} style={{padding:"8px 0",borderBottom:i<(data.measurements||[]).length-1?`1px solid ${C.border}33`:"none"}}>
                     <p style={{margin:"0 0 4px",fontSize:11,color:C.muted,fontFamily:FB}}>{m.date}</p>
                     <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
@@ -2976,7 +3082,8 @@ function AppInner({pin, user, onLogout}){
               {/* Big 3 targets */}
               <div style={{marginTop:10,background:C.surface,borderRadius:8,padding:"10px 12px",border:`1px solid ${C.border}`}}>
                 <p style={{margin:"0 0 6px",fontSize:11,color:C.yellow,fontFamily:FC,letterSpacing:"0.1em",textTransform:"uppercase"}}>THE MISSION - BIG 3</p>
-                {[{name:"Bench Press",current:"205lb",target:"225lb+"},{name:"Back Squat",current:"275lb",target:"315lb+"},{name:"Deadlift",current:"375lb",target:"405lb+"}].map((l,i)=>(
+                {needsSetup&&<p style={{margin:"0 0 6px",fontSize:11,color:C.yellow,fontFamily:FB}}>Set {user.name}'s baselines above to see personal record targets here.</p>}
+                {(myStats&&myStats.prs?[{name:"Bench Press",current:myStats.prs.bench.c+"lb",target:myStats.prs.bench.t+"lb+"},{name:"Back Squat",current:myStats.prs.squat.c+"lb",target:myStats.prs.squat.t+"lb+"},{name:"Deadlift",current:myStats.prs.deadlift.c+"lb",target:myStats.prs.deadlift.t+"lb+"}]:[]).map((l,i)=>(
                   <div key={i} style={{display:"flex",justifyContent:"space-between",padding:"5px 0",borderBottom:i<2?`1px solid ${C.border}33`:"none"}}>
                     <span style={{fontSize:12,fontFamily:FC,color:C.text}}>{l.name}</span>
                     <span style={{fontSize:12,fontFamily:FC}}><span style={{color:C.steel}}>{l.current}</span><span style={{color:C.muted}}> -> </span><span style={{color:C.yellow}}>{l.target}</span></span>
@@ -2985,30 +3092,11 @@ function AppInner({pin, user, onLogout}){
               </div>
             </div>
 
-            {/* Scan history */}
-            {scans.length>0&&(
-              <div style={{background:C.card,borderRadius:12,padding:"14px 16px",marginBottom:12,border:`1px solid ${C.border}`}}>
-                <p style={{margin:"0 0 12px",fontSize:16,fontFamily:FD}}>Hume Scan History</p>
-                <div style={{background:C.surface,borderRadius:8,padding:"8px 0",border:`1px solid ${C.border}`}}>
-                  <div style={{display:"flex",padding:"4px 12px 8px",borderBottom:`1px solid ${C.border}33`}}>
-                    {["DATE","WEIGHT","BF%","MUSCLE"].map(h=>(<span key={h} style={{flex:1,fontSize:9,color:C.muted,fontFamily:FC,letterSpacing:"0.1em"}}>{h}</span>))}
-                  </div>
-                  {scans.slice().reverse().map((s,i)=>(
-                    <div key={i} style={{display:"flex",padding:"8px 12px",borderBottom:i<scans.length-1?`1px solid ${C.border}22`:"none"}}>
-                      <span style={{flex:1,fontSize:10,color:C.muted,fontFamily:FB}}>{s.date}</span>
-                      <span style={{flex:1,fontSize:12,fontWeight:"bold",color:C.yellow,fontFamily:FC}}>{s.w||"-"}</span>
-                      <span style={{flex:1,fontSize:12,fontWeight:"bold",color:C.red,fontFamily:FC}}>{s.bf||"-"}%</span>
-                      <span style={{flex:1,fontSize:12,fontWeight:"bold",color:C.green,fontFamily:FC}}>{s.m||"-"}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
             {/* BF journey */}
             <div style={{background:C.card,borderRadius:12,padding:"14px 16px",marginBottom:8,border:`1px solid ${C.border}`}}>
               <p style={{margin:"0 0 12px",fontSize:16,fontFamily:FD}}>BF% Journey</p>
-              {[{l:"Start",v:11.6,c:C.red},{l:"Phase 1 end",v:10.5,c:C.yellow},{l:"Phase 2 end",v:9.5,c:C.yellow},{l:"Summer goal",v:8.5,c:C.green}].map((p,i)=>(
+              {needsSetup&&<p style={{margin:"0 0 8px",fontSize:11,color:C.yellow,fontFamily:FB}}>Set {user.name}'s baselines above to start the journey.</p>}
+              {(needsSetup?[]:[{l:"Start",v:bfStart,c:C.red},{l:"Phase 1 end",v:myStats.journey?myStats.journey[1]:bfStart,c:C.yellow},{l:"Phase 2 end",v:myStats.journey?myStats.journey[2]:bfStart,c:C.yellow},{l:"Summer goal",v:bfGoal,c:C.green}]).map((p,i)=>(
                 <div key={i} style={{display:"flex",alignItems:"center",gap:10,marginBottom:8}}>
                   <span style={{fontSize:11,color:C.muted,minWidth:90,fontFamily:FC}}>{p.l}</span>
                   <div style={{flex:1,background:C.border,borderRadius:3,height:6}}>
@@ -3017,7 +3105,7 @@ function AppInner({pin, user, onLogout}){
                   <span style={{fontSize:12,fontWeight:"bold",color:p.c,minWidth:36,textAlign:"right",fontFamily:FC}}>{p.v}%</span>
                 </div>
               ))}
-              <p style={{margin:"8px 0 0",fontSize:11,color:C.muted,fontFamily:FB}}>Current: <span style={{color:C.yellow,fontWeight:"bold"}}>{curBF.toFixed(1)}%</span> — {(curBF-8.5).toFixed(1)}% to go</p>
+              <p style={{margin:"8px 0 0",fontSize:11,color:C.muted,fontFamily:FB}}>Current: <span style={{color:C.yellow,fontWeight:"bold"}}>{curBF.toFixed(1)}%</span> — {(curBF-bfGoal).toFixed(1)}% to go</p>
             </div>
           </div>
         )}
@@ -3153,10 +3241,16 @@ function AppInner({pin, user, onLogout}){
                       style={{flex:1,background:C.surface,border:`1px solid ${C.border}`,borderRadius:7,padding:"8px 10px",color:C.text,fontSize:12,fontFamily:FB,outline:"none"}}/>
                     <button onClick={()=>logSkillPractice(sk.id)} style={{background:C.steel,color:"#000",border:"none",borderRadius:7,padding:"8px 12px",fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:FC}}>LOG</button>
                   </div>
-                  <button onClick={()=>advanceSkillLevel(sk.id)} disabled={atMax}
-                    style={{width:"100%",background:atMax?C.border:C.yellow,color:atMax?C.muted:"#000",border:"none",borderRadius:8,padding:"10px",fontSize:12,fontWeight:700,cursor:atMax?"default":"pointer",fontFamily:FC,letterSpacing:"0.08em"}}>
-                    {atMax?"MAX LEVEL REACHED":"ADVANCE TO NEXT LEVEL"}
+                  <button onClick={()=>handleAdvanceSkill(sk)} disabled={atMax}
+                    style={{width:"100%",background:atMax?C.border:armedSkill===sk.id?C.red:C.yellow,color:atMax?C.muted:armedSkill===sk.id?"#fff":"#000",border:"none",borderRadius:8,padding:"10px",fontSize:12,fontWeight:700,cursor:atMax?"default":"pointer",fontFamily:FC,letterSpacing:"0.08em"}}>
+                    {atMax?"MAX LEVEL REACHED":armedSkill===sk.id?"TAP AGAIN TO CONFIRM":"ADVANCE TO NEXT LEVEL"}
                   </button>
+                  {state.level>0&&(
+                    <button onClick={()=>regressSkillLevel(sk.id)}
+                      style={{width:"100%",marginTop:6,background:"none",border:"none",color:C.muted,fontSize:10,cursor:"pointer",fontFamily:FC,letterSpacing:"0.08em"}}>
+                      ← BACK A LEVEL
+                    </button>
+                  )}
                   {(state.log||[]).length>0&&(
                     <div style={{marginTop:10}}>
                       {state.log.slice().reverse().slice(0,3).map((e,i)=>(
