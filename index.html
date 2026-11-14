@@ -2943,6 +2943,7 @@ function AppInner({pin, user, onLogout}){
                   ))}
                 </div>
               )}
+              {(data.wlog||[]).length===0&&<p style={{margin:"10px 0 0",fontSize:11,color:C.muted,fontFamily:FB}}>No entries yet — your saved weight and sleep entries will appear here.</p>}
             </div>
 
             {/* Weight + Sleep chart */}
@@ -3015,6 +3016,7 @@ function AppInner({pin, user, onLogout}){
                   ))}
                 </div>
               )}
+              {scans.length===0&&<p style={{margin:"10px 0 0",fontSize:11,color:C.muted,fontFamily:FB}}>No scans yet — your saved Hume scans will appear here.</p>}
             </div>
 
             {/* Body measurements */}
@@ -3105,7 +3107,7 @@ function AppInner({pin, user, onLogout}){
                   <span style={{fontSize:12,fontWeight:"bold",color:p.c,minWidth:36,textAlign:"right",fontFamily:FC}}>{p.v}%</span>
                 </div>
               ))}
-              <p style={{margin:"8px 0 0",fontSize:11,color:C.muted,fontFamily:FB}}>Current: <span style={{color:C.yellow,fontWeight:"bold"}}>{curBF.toFixed(1)}%</span> — {(curBF-bfGoal).toFixed(1)}% to go</p>
+              {!needsSetup&&<p style={{margin:"8px 0 0",fontSize:11,color:C.muted,fontFamily:FB}}>Current: <span style={{color:C.yellow,fontWeight:"bold"}}>{curBF.toFixed(1)}%</span> — {(curBF-bfGoal).toFixed(1)}% to go</p>}
             </div>
           </div>
         )}
