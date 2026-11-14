@@ -4234,8 +4234,11 @@ function AppInner({pin, user, onLogout}){
 function App(){
   const [activeUser,setActiveUser_] = useState(getActiveUser);
   // Apple Health bridge intake: stage any #h= payload from a shortcut
-  // deep link (and strip the hash) before anything else reads the URL.
-  useEffect(()=>{ intakeHealthHash(); },[]);
+  // deep link (and strip the hash) SYNCHRONOUSLY on first render — child
+  // effects run before parent effects, so doing this in a useEffect here
+  // would stage the payload only AFTER AppInner's apply check had already
+  // run, and the sync would not surface until the next page load.
+  useState(()=>{ intakeHealthHash(); return true; });
   const pin = activeUser?.pin;
   const user = pin ? USERS[pin] : null;
   const handleLogin = (p) => { setActiveUser(p); setActiveUser_({pin:p,ts:Date.now()}); };
