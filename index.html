@@ -2006,6 +2006,8 @@ function AppInner({pin, user, onLogout}){
   const [armedSkill,setArmedSkill]=useState(null);
   const armTimerRef=useRef(null);
   const [weekMsg,setWeekMsg]=useState("");
+  const [resetArm,setResetArm]=useState(false);
+  const resetTimerRef=useRef(null);
   const [baseForm,setBaseForm]=useState(null);
 
   const persist=useCallback(nd=>{setData(nd);save(nd,pin);},[pin]);
@@ -2114,6 +2116,29 @@ function AppInner({pin, user, onLogout}){
       setWeekMsg("");
       persist({...data,weekOverride:next});
     }
+  };
+  // Restart the program at Week 1: clears every week's exercise logs,
+  // completion flags, session notes and the conditioning log. Body
+  // tracking (baselines, weight, scans, measurements) and skill levels
+  // are kept. Two-tap confirm, same pattern as skill advance.
+  const resetProgram=()=>{
+    if(!resetArm){
+      setResetArm(true);
+      if(resetTimerRef.current)clearTimeout(resetTimerRef.current);
+      resetTimerRef.current=setTimeout(()=>setResetArm(false),3000);
+      return;
+    }
+    if(resetTimerRef.current)clearTimeout(resetTimerRef.current);
+    setResetArm(false);
+    const nd={...data};
+    Object.keys(nd).forEach(k=>{
+      if(/^p\d+_d\d+_e\d+_w\d+$/.test(k)||/^done_p\d+_d\d+_e\d+_w\d+$/.test(k))delete nd[k];
+    });
+    nd.sessionNotes={};
+    nd.conditioningLog=[];
+    nd.weekOverride=1;
+    persist(nd);
+    setTab("train");
   };
   // 60-minute mode: persisted per user, default ON. Core exercises render
   // first; opt exercises collapse under "IF YOU HAVE TIME".
@@ -2894,6 +2919,15 @@ function AppInner({pin, user, onLogout}){
                 you can import into the new app so your history carries over.
               </p>
               <button onClick={exportData} style={{width:"100%",background:C.yellow,color:"#000",border:"none",borderRadius:8,padding:"12px",fontSize:14,fontWeight:"bold",cursor:"pointer",fontFamily:FC,textTransform:"uppercase",letterSpacing:"0.1em"}}>DOWNLOAD EXPORT FILE</button>
+            </div>
+
+            {/* Restart program at Week 1 */}
+            <div style={{background:C.card,borderRadius:12,padding:"14px 16px",marginBottom:12,border:`1px solid ${C.red}55`}}>
+              <p style={{margin:"0 0 4px",fontSize:16,fontFamily:FD,color:C.red}}>Restart Program</p>
+              <p style={{margin:"0 0 10px",fontSize:11,color:C.muted,fontFamily:FB,lineHeight:1.5}}>
+                Start over at Week 1: clears every week's logged exercises, completion checkmarks, session notes and conditioning log for {user.name}. Your baselines, weight log, Hume scans, measurements and skill levels are kept. After restarting, use the week stepper in Train to move forward as you finish each week.
+              </p>
+              <button onClick={resetProgram} style={{width:"100%",background:resetArm?C.red:C.surface,color:resetArm?"#fff":C.red,border:`1px solid ${C.red}`,borderRadius:8,padding:"12px",fontSize:14,fontWeight:"bold",cursor:"pointer",fontFamily:FC,textTransform:"uppercase",letterSpacing:"0.1em"}}>{resetArm?"TAP AGAIN TO CONFIRM RESTART":"RESTART AT WEEK 1"}</button>
             </div>
 
             {/* Per-user baselines */}
