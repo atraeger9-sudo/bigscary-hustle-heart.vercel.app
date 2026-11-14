@@ -119,7 +119,7 @@ const calcVolume = (sets) => {
 const isCompound = n => /squat|deadlift|bench|press|row|pull.up|thrust|lunge|dip/i.test(n);
 const isLowerBody = n => /squat|deadlift|thrust|lunge|leg|calf|tibialis/i.test(n);
 
-const calcTarget = (lastSets, ex, week, phase) => {
+const calcTarget = (lastSets, ex, week, phase, opts={}) => {
   if (!lastSets || lastSets.length === 0 || week <= 1) return null;
   const workSets = lastSets.filter(s => !s.isWarmup && !s.isBurnout);
   if (!workSets.length) return null;
@@ -147,14 +147,34 @@ const calcTarget = (lastSets, ex, week, phase) => {
     : null;
   let autoNote = null;
   let nextW;
+  // Personal pace (Smart Coaching): if this lifter has a learned
+  // increment for this lift, it prescribes the jump on the allHit path.
+  const pInc = allHit ? personalIncrement(opts.history, ex) : null;
   if (!allHit && avgMiss >= 2) {
     nextW = Math.round((lastW * 0.95) / 2.5) * 2.5;
     autoNote = "Backed off 5% — last week missed reps";
+  } else if (allHit && pInc !== null) {
+    nextW = lastW + pInc;
+    autoNote = `Personal pace: +${pInc} lb — learned from your log`;
   } else if (allHit && avgRir !== null && avgRir >= 3) {
     nextW = lastW + weightInc * 2;
     autoNote = "Bigger jump — last week had 3+ reps in reserve";
   } else {
     nextW = allHit ? lastW + weightInc : lastW;
+  }
+  // Readiness scaling (Smart Coaching): today's readiness eases or
+  // sharpens the final target. Never on a deload week (the deload
+  // branch below still wins outright). Note priority: back-off >
+  // readiness > personal pace > bigger jump — a readiness note
+  // replaces pace/jump notes but never the back-off warning.
+  const rd = opts.readiness;
+  if (rd && rd.factor !== 1 && !isDeload(week)) {
+    nextW = Math.max(0, Math.round((nextW * rd.factor) / 2.5) * 2.5);
+    const pct = Math.abs(Math.round((rd.factor - 1) * 100));
+    const rNote = rd.factor < 1
+      ? `Readiness ${rd.score} — targets eased ${pct}% today`
+      : `Readiness ${rd.score} — primed, +${pct}% today`;
+    if (!autoNote || autoNote.indexOf("Backed off") !== 0) autoNote = rNote;
   }
   if (isDeload(week)) {
     // Deload week: 60% of last working weight, rounded to nearest 5.
@@ -183,6 +203,62 @@ const calcTarget = (lastSets, ex, week, phase) => {
   }));
   if (autoNote) out.forEach(s=>{ s.autoNote = autoNote; });
   return out;
+};
+
+// ── Personal pace helpers (Smart Coaching) ──────────────────────────
+// Top work-set weight of one logged week (first work set, matching
+// calcTarget's lastW convention).
+const weekTopW = (sets) => {
+  const ws = (sets || []).filter(s => !s.isWarmup && !s.isBurnout);
+  return ws.length ? parseFloat(ws[0].w) || 0 : 0;
+};
+// Same hit rule calcTarget applies to lastSets: every work set at
+// target reps with RIR <= 1 (missing RIR counts as a hit).
+const weekAllHit = (sets, ex) => {
+  const ws = (sets || []).filter(s => !s.isWarmup && !s.isBurnout);
+  if (!ws.length) return false;
+  const tgt = typeof ex.r === "number" ? ex.r : parseInt(ex.r) || 10;
+  return ws.every(s => {
+    const reps = parseInt(s.r) || 0;
+    const rir  = parseInt(s.rir);
+    return reps >= tgt && (isNaN(rir) || rir <= 1);
+  });
+};
+// Learn the jump size THIS lifter actually succeeds with on THIS lift.
+// Walk consecutive logged weeks: a "successful jump" is a week whose
+// top weight rose vs the prior logged week AND whose sets all hit —
+// the median of those deltas is the personal pace. Separately, if the
+// two most recent logged weeks both raised the weight and both missed,
+// the pace halves (recent failure outweighs the older median). Returns
+// null when there is nothing to learn or the learned pace equals the
+// default increment, so callers fall back to stock behavior.
+const personalIncrement = (history, ex) => {
+  if (!history || history.length < 2 || ex.nw) return null;
+  const lower = isLowerBody(ex.n);
+  const defInc = lower ? 10 : isCompound(ex.n) ? 5 : 2.5;
+  const bounds = lower ? [5, 20] : isCompound(ex.n) ? [2.5, 10] : [1.25, 5];
+  const tops = history.map(weekTopW);
+  const deltas = [];
+  for (let i = 1; i < history.length; i++) {
+    const d = tops[i] - tops[i - 1];
+    if (d > 0 && weekAllHit(history[i], ex)) deltas.push(d);
+  }
+  let inc = null;
+  if (deltas.length >= 2) {
+    const sorted = [...deltas].sort((a, b) => a - b);
+    const mid = Math.floor(sorted.length / 2);
+    inc = sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+  }
+  if (history.length >= 3) {
+    const n = history.length;
+    const up1 = tops[n - 2] > tops[n - 3], up2 = tops[n - 1] > tops[n - 2];
+    if (up1 && up2 && !weekAllHit(history[n - 2], ex) && !weekAllHit(history[n - 1], ex)) {
+      inc = Math.max(bounds[0], defInc / 2);
+    }
+  }
+  if (inc === null) return null;
+  inc = Math.round(Math.max(bounds[0], Math.min(bounds[1], inc)) * 4) / 4;
+  return inc === defInc ? null : inc;
 };
 
 // Warm-up sets generator
@@ -2212,10 +2288,61 @@ function AppInner({pin, user, onLogout}){
   const getLast=ei=>data[SK2(ph,di,ei)];
   const isDone=ei=>!!data[DK(ph,di,ei,currentWeek)];
   const getHistory=ei=>Array.from({length:currentWeek-1},(_,i)=>data[WK(ph,di,ei,i+1)]||null).filter(Boolean);
+
+  // ── Smart Coaching ───────────────────────────────────────────────
+  // Readiness: blends last night's sleep, the recent sleep average and
+  // recent conditioning load into a 0-100 score plus a target
+  // multiplier. Formula: base 70, +(lastNight-7h)*10 (clamped ±20),
+  // +(sleepAvg-7h)*5 (clamped ±10), -(recentRPE-7)*3 when the last 3
+  // days of conditioning averaged above RPE 7 (clamped -15..0), total
+  // clamped 5..100. No sleep logged at all → null (fully neutral).
+  const readinessInfo=(()=>{
+    const wl=(data.wlog||[]).filter(e=>parseFloat(e.sleep)>0);
+    if(!wl.length)return null;
+    const clampN=(v,a,b)=>Math.max(a,Math.min(b,v));
+    const lastNight=parseFloat(wl[wl.length-1].sleep);
+    const last7=wl.slice(-7);
+    const sleepAvg=last7.reduce((s,e)=>s+parseFloat(e.sleep),0)/last7.length;
+    const nowMs=Date.now();
+    const recent=(data.conditioningLog||[]).filter(c=>c.rpe!=null&&c.ts&&(nowMs-c.ts)<=3*24*3600*1000);
+    const recentLoad=recent.length?recent.reduce((s,c)=>s+parseFloat(c.rpe),0)/recent.length:null;
+    let score=70+clampN((lastNight-7)*10,-20,20)+clampN((sleepAvg-7)*5,-10,10);
+    if(recentLoad!==null&&recentLoad>7)score+=clampN(-(recentLoad-7)*3,-15,0);
+    score=Math.round(clampN(score,5,100));
+    const factor=score>=90?1.02:score>=80?1:score>=65?0.97:0.94;
+    const label=score>=90?"Primed":score>=80?"Ready":score>=65?"Flat":"Low";
+    return {score,factor,label,lastNight,sleepAvg,sleepNights:last7.length,recentLoad};
+  })();
+  // Weight trend: needs 6+ weigh-ins spanning 10+ days. Compares the
+  // mean of the latest 3 entries against the 3 before them; the time
+  // between the two groups' mean timestamps converts the change into
+  // a per-week rate. Entries carry ts (saveWeight and CSV import both
+  // set it); a date-string parse is the fallback.
+  const weightTrend=(()=>{
+    const wl=(data.wlog||[]).filter(e=>parseFloat(e.w)>0);
+    if(wl.length<6)return null;
+    const tOf=e=>e.ts||new Date(e.date).getTime()||0;
+    const sorted=[...wl].sort((a,b)=>tOf(a)-tOf(b));
+    const spanDays=(tOf(sorted[sorted.length-1])-tOf(sorted[0]))/86400000;
+    if(spanDays<10)return null;
+    const meanW=a=>a.reduce((s,e)=>s+parseFloat(e.w),0)/a.length;
+    const meanT=a=>a.reduce((s,e)=>s+tOf(e),0)/a.length;
+    const prior=sorted.slice(-6,-3),recent=sorted.slice(-3);
+    const weeks=(meanT(recent)-meanT(prior))/(7*86400000);
+    if(!(weeks>0))return null;
+    return {rate:(meanW(recent)-meanW(prior))/weeks,spanDays:Math.round(spanDays),count:wl.length};
+  })();
+
   const getTargets=ei=>{
     const last=getLast(ei);
     if(!last)return null;
-    return calcTarget(last,WO[ph][di].ex[ei],currentWeek,ph);
+    // Full per-week history for personal-pace learning: prior weeks
+    // oldest→newest, with the latest sets appended — unless the final
+    // history entry already IS those sets (same content, when last
+    // week's save also lives under its WK key).
+    const hist=getHistory(ei);
+    const fullHist=(hist.length&&JSON.stringify(hist[hist.length-1])===JSON.stringify(last))?hist:[...hist,last];
+    return calcTarget(last,WO[ph][di].ex[ei],currentWeek,ph,{history:fullHist,readiness:readinessInfo});
   };
 
   // Plateau flags: exercises in the current phase whose last two logged
@@ -2316,6 +2443,10 @@ function AppInner({pin, user, onLogout}){
     persist({...data,stats});
     setBaseForm(null);
   };
+  // Calorie coach (Smart Coaching): the weight-trend suggestion in
+  // Fuel stores a flat adjustment here. Applying sets the value (it
+  // never stacks); 0 clears it. Fuel adds it to both calorie targets.
+  const applyCalAdjust=(v)=>persist({...data,calAdjust:v});
 
   // Export all locally-stored training data as a JSON file, for migrating
   // into the new Supabase-backed platform. Purely additive/read-only:
@@ -2458,7 +2589,25 @@ function AppInner({pin, user, onLogout}){
         if(ws.length<2)return null;
         const series=ws.map(w=>({w,v:Math.round(weeks[w])}));
         const first=series[0].v,latest=series[series.length-1].v;
-        return {name,series,first,latest,delta:first?((latest-first)/first)*100:0,lastWeek:ws[ws.length-1]};
+        // Strength projection (Smart Coaching): least-squares slope of
+        // weekly best e1RM vs week number (needs 3+ points), and for
+        // the big three an ETA to the lifter's 1RM goal at that pace.
+        let slope=null,proj=null;
+        if(series.length>=3){
+          const nPts=series.length;
+          const mx=series.reduce((s,p)=>s+p.w,0)/nPts;
+          const my=series.reduce((s,p)=>s+p.v,0)/nPts;
+          let num=0,den=0;
+          series.forEach(p=>{num+=(p.w-mx)*(p.v-my);den+=(p.w-mx)*(p.w-mx);});
+          slope=den?num/den:null;
+          const goalKey=/deadlift/i.test(name)?"deadlift":/bench/i.test(name)?"bench":/squat/i.test(name)?"squat":null;
+          const goal=goalKey&&myStats&&myStats.prs&&myStats.prs[goalKey]?(parseFloat(myStats.prs[goalKey].t)||0):0;
+          if(slope!==null&&slope>0.2&&goal>0&&latest<goal){
+            const eta=Math.ceil(currentWeek+(goal-latest)/slope);
+            proj={goal,eta:eta>24?null:eta};
+          }
+        }
+        return {name,series,first,latest,delta:first?((latest-first)/first)*100:0,lastWeek:ws[ws.length-1],slope,proj};
       })
       .filter(Boolean)
       .sort((a,b)=>b.lastWeek-a.lastWeek)
@@ -2481,6 +2630,26 @@ function AppInner({pin, user, onLogout}){
   })();
   const adherence=adherenceRows?adherenceRows.slice(-6):null;
   const thisWeekAdherence=adherenceRows?((adherenceRows.find(r=>r.w===currentWeek)||{}).pct??null):null;
+  // Smart Coach aggregates: how many current-phase lifts run on a
+  // learned personal pace (same history assembly as getTargets), and
+  // the fastest-progressing charted lift by e1RM slope.
+  const personalPaceCount=(()=>{
+    let n=0;
+    WO[ph].forEach((day,d2)=>{
+      day.ex.forEach((ex,e2)=>{
+        const hist=[];
+        for(let w=1;w<currentWeek;w++){ if(data[WK(ph,d2,e2,w)]) hist.push(data[WK(ph,d2,e2,w)]); }
+        const last=data[SK2(ph,d2,e2)];
+        if(last&&(!hist.length||JSON.stringify(hist[hist.length-1])!==JSON.stringify(last)))hist.push(last);
+        if(personalIncrement(hist,ex)!==null)n++;
+      });
+    });
+    return n;
+  })();
+  const fastestLift=(()=>{
+    const cand=strengthTrends.filter(t=>t.slope!==null&&t.slope>0);
+    return cand.length?cand.reduce((a,b)=>b.slope>a.slope?b:a):null;
+  })();
 
   const scans=data.scans||[];
   const lastScan=scans[scans.length-1];
@@ -2524,7 +2693,9 @@ function AppInner({pin, user, onLogout}){
   // targets equal the template (factor exactly 1), so his numbers are
   // untouched; anyone else's plan scales to their baselines. Item
   // description text stays as written — amounts in text are guides.
-  const fuelTargetCal=myStats?(mealDt==="training"?(myStats.trainCal||mpBase.cal):(myStats.restCal||mpBase.cal)):mpBase.cal;
+  const calAdjust=myStats?(parseInt(data.calAdjust)||0):0;
+  const aboveBfGoal=myStats?(parseFloat(myStats.bf)||0)>(parseFloat(myStats.bfGoal)||0):false;
+  const fuelTargetCal=myStats?(mealDt==="training"?((myStats.trainCal||mpBase.cal)+calAdjust):((myStats.restCal||mpBase.cal)+calAdjust)):mpBase.cal;
   const fuelFactor=(myStats&&fuelTargetCal>0&&mpBase.cal>0)?fuelTargetCal/mpBase.cal:1;
   const fuelScaled=Math.abs(fuelFactor-1)>=0.02;
   const scaleSection=(sec)=>fuelScaled?{...sec,items:sec.items.map(it=>({...it,
@@ -2677,6 +2848,11 @@ function AppInner({pin, user, onLogout}){
             <div style={{background:C.surface,borderRadius:10,padding:"8px 12px",marginBottom:10,border:`1px solid ${C.border}`}}>
               <p style={{margin:0,fontSize:12,color:C.steel,fontFamily:FB,lineHeight:1.5}}>
                 <span style={{color:pc,fontFamily:FC,fontWeight:700}}>Week {currentWeek}</span> · {wo.day} — {wo.label} · ~{estMinsFor(wo.ex.filter(e=>e.core))} min core · {thisWeekAdherence===null?"This week: not started":`This week: ${thisWeekAdherence}% done`}
+                {" · "}{readinessInfo?(
+                  <span>Readiness <span style={{color:readinessInfo.score>=80?C.green:readinessInfo.score>=65?C.yellow:C.red,fontWeight:700}}>{readinessInfo.score}</span></span>
+                ):(
+                  <span>Log sleep for readiness</span>
+                )}
               </p>
             </div>
 
@@ -3062,6 +3238,56 @@ function AppInner({pin, user, onLogout}){
               {fuelScaled&&(
                 <div style={{marginTop:10,display:"inline-block",background:pc+"22",border:`1px solid ${pc}44`,borderRadius:12,padding:"4px 10px"}}>
                   <span style={{fontSize:12,color:pc,fontFamily:FC,fontWeight:700}}>Portions scaled ×{fuelFactor.toFixed(2)} to your {mp.cal.toLocaleString()} kcal target</span>
+                </div>
+              )}
+              {calAdjust!==0&&(
+                <p style={{margin:"8px 0 0",fontSize:12,color:C.yellow,fontFamily:FC,fontWeight:700}}>Coach adjustment: {calAdjust>0?"+":""}{calAdjust} kcal</p>
+              )}
+            </div>
+            {/* Calorie coach — steers both targets from the weight trend */}
+            <div style={{background:C.card,borderRadius:18,padding:"16px 16px",marginBottom:12,border:`1px solid ${C.green}33`}}>
+              <p style={{margin:"0 0 8px",fontSize:12,color:C.green,letterSpacing:"0.1em",textTransform:"uppercase",fontFamily:FB,fontWeight:600}}>
+                Coach · Weight Trend
+              </p>
+              {!weightTrend?(
+                <p style={{margin:0,fontSize:12,color:C.muted,fontFamily:FB,lineHeight:1.5}}>
+                  Log your weight a few more times and I'll start steering calories from your trend.
+                </p>
+              ):!aboveBfGoal?(
+                <p style={{margin:0,fontSize:12,color:C.muted,fontFamily:FB,lineHeight:1.5}}>
+                  Trend: {weightTrend.rate>0?"+":""}{weightTrend.rate.toFixed(1)} lb/wk across {weightTrend.count} weigh-ins. Calorie steering switches on while you're above your body-fat goal.
+                </p>
+              ):weightTrend.rate>-0.1?(
+                <div>
+                  <p style={{margin:"0 0 10px",fontSize:12,color:C.text,fontFamily:FB,lineHeight:1.5}}>
+                    Your weight has been flat ({weightTrend.rate>0?"+":""}{weightTrend.rate.toFixed(1)} lb/wk). Drop 150 kcal to restart fat loss.
+                  </p>
+                  {calAdjust===-150?(
+                    <p style={{margin:0,fontSize:12,color:C.green,fontFamily:FC,fontWeight:700}}>Applied — targets are already 150 kcal lower.</p>
+                  ):(
+                    <button onClick={()=>applyCalAdjust(-150)} style={{background:C.green,color:"#000",border:"none",borderRadius:8,padding:"10px 14px",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:FC,letterSpacing:"0.06em"}}>APPLY −150 KCAL</button>
+                  )}
+                </div>
+              ):weightTrend.rate<-1.5?(
+                <div>
+                  <p style={{margin:"0 0 10px",fontSize:12,color:C.text,fontFamily:FB,lineHeight:1.5}}>
+                    You're dropping fast ({weightTrend.rate.toFixed(1)} lb/wk) — add 150 kcal to protect muscle.
+                  </p>
+                  {calAdjust===150?(
+                    <p style={{margin:0,fontSize:12,color:C.green,fontFamily:FC,fontWeight:700}}>Applied — targets are already 150 kcal higher.</p>
+                  ):(
+                    <button onClick={()=>applyCalAdjust(150)} style={{background:C.green,color:"#000",border:"none",borderRadius:8,padding:"10px 14px",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:FC,letterSpacing:"0.06em"}}>APPLY +150 KCAL</button>
+                  )}
+                </div>
+              ):(
+                <p style={{margin:0,fontSize:12,color:C.text,fontFamily:FB,lineHeight:1.5}}>
+                  On track: losing ~{Math.abs(weightTrend.rate).toFixed(1)} lb/wk.
+                </p>
+              )}
+              {calAdjust!==0&&(
+                <div style={{marginTop:10,display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
+                  <span style={{fontSize:12,color:C.yellow,fontFamily:FC,fontWeight:700}}>Coach adjustment active: {calAdjust>0?"+":""}{calAdjust} kcal on both targets</span>
+                  <button onClick={()=>applyCalAdjust(0)} style={{background:C.surface,color:C.text,border:`1px solid ${C.border}`,borderRadius:8,padding:"7px 12px",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:FC,letterSpacing:"0.06em"}}>RESET</button>
                 </div>
               )}
             </div>
@@ -3543,6 +3769,27 @@ function AppInner({pin, user, onLogout}){
               {!needsSetup&&<p style={{margin:"8px 0 0",fontSize:12,color:C.muted,fontFamily:FB}}>Current: <span style={{color:C.yellow,fontWeight:"bold"}}>{curBF.toFixed(1)}%</span> — {(curBF-bfGoal).toFixed(1)}% to go</p>}
             </div>
 
+            {/* Smart Coach summary */}
+            <div style={{background:C.card,borderRadius:12,padding:"14px 16px",marginBottom:12,border:`1px solid ${pc}33`}}>
+              <p style={{margin:"0 0 12px",fontSize:16,fontFamily:FD}}>Smart Coach</p>
+              {(()=>{
+                const lines=[];
+                if(readinessInfo)lines.push(`Readiness ${readinessInfo.score} — ${readinessInfo.lastNight.toFixed(1)}h sleep last night, averaging ${readinessInfo.sleepAvg.toFixed(1)}h`);
+                if(readinessInfo)lines.push(`Sleep average ${readinessInfo.sleepAvg.toFixed(1)}h across your last ${readinessInfo.sleepNights} logged night${readinessInfo.sleepNights===1?"":"s"}`);
+                if(weightTrend){
+                  const r=weightTrend.rate;
+                  lines.push(r<-0.1?`Weight: losing ~${Math.abs(r).toFixed(1)} lb/wk over ${weightTrend.spanDays} days`
+                    :r>0.1?`Weight: gaining ~${r.toFixed(1)} lb/wk over ${weightTrend.spanDays} days`
+                    :`Weight: flat over ${weightTrend.spanDays} days (${r>0?"+":""}${r.toFixed(1)} lb/wk)`);
+                }
+                if(fastestLift)lines.push(`${fastestLift.name} is your fastest gainer at +${fastestLift.slope.toFixed(1)} lb/wk`);
+                if(stalledExercises.length)lines.push(`Stalled: ${stalledExercises.join(", ")} — missed targets two logged weeks in a row`);
+                if(personalPaceCount>0)lines.push(`${personalPaceCount} lift${personalPaceCount>1?"s are":" is"} on a personal pace learned from your log`);
+                if(!lines.length)return <p style={{margin:0,fontSize:12,color:C.muted,fontFamily:FB,lineHeight:1.5}}>Smart Coach wakes up as you log — sleep, weight and a few weeks of lifts switch on readiness, calorie steering and personal pacing.</p>;
+                return lines.map((l,i)=>(<p key={i} style={{margin:i?"6px 0 0":0,fontSize:12,color:C.text,fontFamily:FB,lineHeight:1.5}}>• {l}</p>));
+              })()}
+            </div>
+
             {/* Progress charts */}
             <div style={{background:C.card,borderRadius:12,padding:"14px 16px",marginBottom:12,border:`1px solid ${C.border}`}}>
               <p style={{margin:"0 0 12px",fontSize:16,fontFamily:FD}}>Progress Charts</p>
@@ -3554,8 +3801,13 @@ function AppInner({pin, user, onLogout}){
                   <div key={t.name} style={{marginBottom:12}}>
                     <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",gap:8}}>
                       <span style={{fontSize:12,fontFamily:FC,color:C.text}}>{t.name}</span>
-                      <span style={{fontSize:12,fontFamily:FC,color:C.muted}}>{t.first} → <span style={{color:C.text,fontWeight:"bold"}}>{t.latest}</span> lb <span style={{color:t.delta>=0?C.green:C.red,fontWeight:"bold"}}>{t.delta>=0?"+":""}{t.delta.toFixed(1)}%</span></span>
+                      <span style={{fontSize:12,fontFamily:FC,color:C.muted}}>{t.first} → <span style={{color:C.text,fontWeight:"bold"}}>{t.latest}</span> lb <span style={{color:t.delta>=0?C.green:C.red,fontWeight:"bold"}}>{t.delta>=0?"+":""}{t.delta.toFixed(1)}%</span>{t.slope!==null&&<span style={{color:t.slope>=0?C.green:C.red}}> · {t.slope>=0?"+":""}{t.slope.toFixed(1)} lb/wk</span>}</span>
                     </div>
+                    {t.proj&&(
+                      <p style={{margin:"2px 0 0",fontSize:12,color:C.steel,fontFamily:FB}}>
+                        → on pace for {t.proj.goal} lb {t.proj.eta?`around Week ${t.proj.eta}`:"beyond this cycle"}
+                      </p>
+                    )}
                     <div style={{display:"flex",alignItems:"flex-end",gap:3,height:38,marginTop:4}}>
                       {t.series.map(s=>(
                         <div key={s.w} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:2}}>
