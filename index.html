@@ -41,7 +41,7 @@ const {useState,useEffect,useRef,useCallback,useMemo} = React;
 // C.card, etc.) so swapping hex values here restyles the whole app.
 const C={bg:"#12141A",surface:"#171A21",card:"#1A1D24",border:"#262A33",
   yellow:"#D4A857",yellowDim:"#8A6E3A",red:"#C85C50",redDim:"#6B332C",
-  blue:"#4A7FBF",blueBright:"#6FA8DC",steel:"#8891A1",muted:"#5E6473",
+  blue:"#4A7FBF",blueBright:"#6FA8DC",steel:"#8891A1",muted:"#767F90",
   text:"#E7E9EE",dim:"#2A2E38",green:"#5F9C8C",greenBright:"#6FAFA0",
   purple:"#9C7FB5",orange:"#C98A4B"};
 const FD="'Space Grotesk',sans-serif";
@@ -76,6 +76,19 @@ const TRAINING_DAYS_OF_WEEK = [1,2,4,5]; // Mon,Tue,Thu,Fri
 const calcCurrentWeek = () => {
   const now = new Date();
   const diff = Math.floor((now - START_DATE) / (1000*60*60*24*7));
+  return Math.max(1, Math.min(12, diff + 1));
+};
+
+// Per-user program start (yyyy-mm-dd, local time). Each profile advances
+// from its own start/restart date instead of one global calendar.
+const isoToday = () => { const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
+const isoDaysAgo = (n) => { const d=new Date(); d.setDate(d.getDate()-n); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
+const weekFromStart = (iso) => {
+  if(!iso) return null;
+  const start=new Date(iso+"T00:00:00");
+  if(isNaN(start)) return null;
+  const today=new Date(); today.setHours(0,0,0,0);
+  const diff=Math.floor((today-start)/(1000*60*60*24*7));
   return Math.max(1, Math.min(12, diff + 1));
 };
 
@@ -120,7 +133,29 @@ const calcTarget = (lastSets, ex, week, phase) => {
   });
   const lastW = parseFloat(workSets[0]?.w)||0;
   const tgtR  = typeof ex.r==="number" ? ex.r : parseInt(ex.r)||10;
-  const nextW = allHit ? lastW + weightInc : lastW;
+  // Autoregulation: react to HOW last week went, not just hit/miss.
+  // Sets that fell short by 2+ reps on average back the weight off 5%;
+  // hitting every set with 3+ reps in reserve earns a double jump.
+  // The deload branch below is untouched and still takes precedence.
+  const missedSets = workSets.filter(s => (parseInt(s.r)||0) < tgtR);
+  const avgMiss = missedSets.length
+    ? missedSets.reduce((sum,s)=>sum+(tgtR-(parseInt(s.r)||0)),0)/missedSets.length
+    : 0;
+  const rirSets = workSets.filter(s => !isNaN(parseInt(s.rir)));
+  const avgRir = rirSets.length
+    ? rirSets.reduce((sum,s)=>sum+parseInt(s.rir),0)/rirSets.length
+    : null;
+  let autoNote = null;
+  let nextW;
+  if (!allHit && avgMiss >= 2) {
+    nextW = Math.round((lastW * 0.95) / 2.5) * 2.5;
+    autoNote = "Backed off 5% — last week missed reps";
+  } else if (allHit && avgRir !== null && avgRir >= 3) {
+    nextW = lastW + weightInc * 2;
+    autoNote = "Bigger jump — last week had 3+ reps in reserve";
+  } else {
+    nextW = allHit ? lastW + weightInc : lastW;
+  }
   if (isDeload(week)) {
     // Deload week: 60% of last working weight, rounded to nearest 5.
     // No FAILURE/BURNOUT final set \u2014 recovery is the point of the week.
@@ -133,17 +168,21 @@ const calcTarget = (lastSets, ex, week, phase) => {
     }));
   }
   if (phase===2) {
-    return Array.from({length:ex.s},(_,i)=>({
+    const out2 = Array.from({length:ex.s},(_,i)=>({
       w: Math.max(0, nextW-(i*(lower?10:5))).toString(),
       r: i===ex.s-1?"FAILURE":tgtR.toString(),
       isBurnout: i===ex.s-1,
     }));
+    if (autoNote) out2.forEach(s=>{ s.autoNote = autoNote; });
+    return out2;
   }
-  return Array.from({length:ex.s},(_,i)=>({
+  const out = Array.from({length:ex.s},(_,i)=>({
     w: nextW.toString(),
     r: i===ex.s-1&&phase>=1?"BURNOUT":tgtR.toString(),
     isBurnout: i===ex.s-1&&phase>=1,
   }));
+  if (autoNote) out.forEach(s=>{ s.autoNote = autoNote; });
+  return out;
 };
 
 // Warm-up sets generator
@@ -480,10 +519,10 @@ const MEALS=[
     "c": 336,
     "f": 77,
     "bkfst": {
-      "time": "5:00-7:30 AM",
+      "time": "5:20-7:30 AM",
       "items": [
         {
-          "l": "XS Pre-Workout (5:00AM)",
+          "l": "XS Pre-Workout (5:20AM)",
           "d": "XS Pre-Workout only.",
           "cal": 10,
           "p": 0,
@@ -492,22 +531,22 @@ const MEALS=[
           "xs": true
         },
         {
-          "l": "Breakfast (5:05AM)",
-          "d": "1 cup oats + 3 eggs + banana + cinnamon + a few almonds. Cook the oats the night before, scramble the eggs in the morning — 5 minutes.",
-          "cal": 685,
-          "p": 33,
-          "c": 85,
-          "f": 25,
-          "xs": false
-        },
-        {
-          "l": "XS Post-Workout Shake (7:15AM)",
+          "l": "XS Post-Workout Shake (6:40AM)",
           "d": "XS Grass Fed Whey + XS Muscle Multiplier + banana",
           "cal": 290,
           "p": 26,
           "c": 40,
           "f": 4,
           "xs": true
+        },
+        {
+          "l": "Breakfast (7:00AM)",
+          "d": "1 cup oats + 3 eggs + banana + cinnamon + a few almonds. Cook the oats the night before, scramble the eggs in the morning — 5 minutes.",
+          "cal": 685,
+          "p": 33,
+          "c": 85,
+          "f": 25,
+          "xs": false
         }
       ],
       "note": "One whey scoop today, right after training — the one spot fast-digesting protein actually matters. Everything else is whole food."
@@ -658,10 +697,10 @@ const MEALS=[
     "c": 336,
     "f": 77,
     "bkfst": {
-      "time": "5:00-7:30 AM",
+      "time": "5:20-7:30 AM",
       "items": [
         {
-          "l": "XS Pre-Workout (5:00AM)",
+          "l": "XS Pre-Workout (5:20AM)",
           "d": "XS Pre-Workout only.",
           "cal": 10,
           "p": 0,
@@ -670,22 +709,22 @@ const MEALS=[
           "xs": true
         },
         {
-          "l": "Breakfast (5:05AM)",
-          "d": "1 cup oats + 3 eggs + banana + cinnamon + a few almonds. Cook the oats the night before, scramble the eggs in the morning — 5 minutes.",
-          "cal": 685,
-          "p": 33,
-          "c": 85,
-          "f": 25,
-          "xs": false
-        },
-        {
-          "l": "XS Post-Workout Shake (7:15AM)",
+          "l": "XS Post-Workout Shake (6:40AM)",
           "d": "XS Grass Fed Whey + XS Muscle Multiplier + banana",
           "cal": 290,
           "p": 26,
           "c": 40,
           "f": 4,
           "xs": true
+        },
+        {
+          "l": "Breakfast (7:00AM)",
+          "d": "1 cup oats + 3 eggs + banana + cinnamon + a few almonds. Cook the oats the night before, scramble the eggs in the morning — 5 minutes.",
+          "cal": 685,
+          "p": 33,
+          "c": 85,
+          "f": 25,
+          "xs": false
         }
       ],
       "note": "One whey scoop today, right after training — the one spot fast-digesting protein actually matters. Everything else is whole food."
@@ -836,10 +875,10 @@ const MEALS=[
     "c": 336,
     "f": 77,
     "bkfst": {
-      "time": "5:00-7:30 AM",
+      "time": "5:20-7:30 AM",
       "items": [
         {
-          "l": "XS Pre-Workout (5:00AM)",
+          "l": "XS Pre-Workout (5:20AM)",
           "d": "XS Pre-Workout only.",
           "cal": 10,
           "p": 0,
@@ -848,22 +887,22 @@ const MEALS=[
           "xs": true
         },
         {
-          "l": "Breakfast (5:05AM)",
-          "d": "1 cup oats + 3 eggs + banana + cinnamon + a few almonds. Cook the oats the night before, scramble the eggs in the morning — 5 minutes.",
-          "cal": 685,
-          "p": 33,
-          "c": 85,
-          "f": 25,
-          "xs": false
-        },
-        {
-          "l": "XS Post-Workout Shake (7:15AM)",
+          "l": "XS Post-Workout Shake (6:40AM)",
           "d": "XS Grass Fed Whey + XS Muscle Multiplier + banana",
           "cal": 290,
           "p": 26,
           "c": 40,
           "f": 4,
           "xs": true
+        },
+        {
+          "l": "Breakfast (7:00AM)",
+          "d": "1 cup oats + 3 eggs + banana + cinnamon + a few almonds. Cook the oats the night before, scramble the eggs in the morning — 5 minutes.",
+          "cal": 685,
+          "p": 33,
+          "c": 85,
+          "f": 25,
+          "xs": false
         }
       ],
       "note": "One whey scoop today, right after training — the one spot fast-digesting protein actually matters. Everything else is whole food."
@@ -1010,8 +1049,8 @@ const MEALS=[
 
 // ── SUPPLEMENT DATA ────────────────────────────────────────────────────────
 const DAILY_SUPPS = [
-  {id:"preworkout",   name:"XS Pre-Workout",        time:"5:00 AM",   cat:"xs",     trainOnly:true,  note:"Training days only. 115mg caffeine. No coffee."},
-  {id:"breakfast_xs", name:"XS Post-Workout Trinity",time:"7:15 AM",  cat:"xs",     trainOnly:true,  note:"Muscle Multiplier FIRST then Whey x2 + Post-Workout."},
+  {id:"preworkout",   name:"XS Pre-Workout",        time:"5:20 AM",   cat:"xs",     trainOnly:true,  note:"Training days only. 115mg caffeine. No coffee."},
+  {id:"breakfast_xs", name:"XS Post-Workout Trinity",time:"6:40 AM",  cat:"xs",     trainOnly:true,  note:"Muscle Multiplier FIRST then Whey x2 + Post-Workout."},
   {id:"ignite",       name:"XS Ignite Powder",       time:"Daily",    cat:"xs",     trainOnly:false, note:"Daily for fat loss. Pre-cardio or mid-morning."},
   {id:"perfectpack",  name:"Perfect Pack AM",         time:"Breakfast",cat:"nut",    trainOnly:false, note:"With food. Every morning."},
   {id:"liver",        name:"Liver Health",            time:"Breakfast",cat:"nut",    trainOnly:false, note:"With breakfast. Supports fat metabolism."},
@@ -1217,7 +1256,7 @@ const RestTimer=({onClose})=>{
     <div style={{position:"fixed",inset:0,zIndex:300,display:"flex",alignItems:"flex-end",background:"rgba(0,0,0,0.9)"}} onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
       <div style={{width:"100%",maxWidth:430,margin:"0 auto",background:C.card,borderRadius:"16px 16px 0 0",padding:"28px 20px calc(48px + env(safe-area-inset-bottom))",borderBottom:"none",textAlign:"center"}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
-          <p style={{margin:0,fontSize:11,color:C.muted,letterSpacing:"0.25em",textTransform:"uppercase",fontFamily:FC}}>REST TIMER</p>
+          <p style={{margin:0,fontSize:12,color:C.muted,letterSpacing:"0.25em",textTransform:"uppercase",fontFamily:FC}}>REST TIMER</p>
           <button onClick={onClose} aria-label="Close rest timer" style={{background:C.surface,border:`1px solid ${C.border}`,borderRadius:8,width:32,height:32,color:C.text,fontSize:16,cursor:"pointer",lineHeight:1}}>✕</button>
         </div>
         <svg width="130" height="130" viewBox="0 0 130 130" style={{display:"block",margin:"0 auto 20px"}}>
@@ -1264,13 +1303,13 @@ const InlineTimer=({seconds,label,onDone})=>{
             strokeDasharray="106.8" strokeDashoffset={106.8*(1-pct)} strokeLinecap="round"
             transform="rotate(-90 20 20)" style={{transition:"stroke-dashoffset 1s linear"}}/>
         </svg>
-        <span style={{fontSize:9,fontWeight:"bold",fontFamily:FC,color:col,position:"relative",zIndex:1,textAlign:"center"}}>
+        <span style={{fontSize:11,fontWeight:"bold",fontFamily:FC,color:col,position:"relative",zIndex:1,textAlign:"center"}}>
           {done?"GO":secs>=60?`${Math.floor(secs/60)}:${String(secs%60).padStart(2,"0")}`:secs}
         </span>
       </div>
       <div>
         <p style={{margin:0,fontSize:12,fontWeight:"bold",fontFamily:FC,color:done?C.green:C.text}}>{done?"REST DONE - NEXT SET!":(label||"REST")}</p>
-        <p style={{margin:0,fontSize:10,color:C.muted,fontFamily:FB}}>{done?"Go when ready":secs<30?"Almost time...":"Recover fully"}</p>
+        <p style={{margin:0,fontSize:12,color:C.muted,fontFamily:FB}}>{done?"Go when ready":secs<30?"Almost time...":"Recover fully"}</p>
       </div>
     </div>
   );
@@ -1279,7 +1318,7 @@ const InlineTimer=({seconds,label,onDone})=>{
 // ── RIR SELECTOR ───────────────────────────────────────────────────────────
 const RIRSelect=({value,onChange})=>(
   <div style={{marginTop:8}}>
-    <p style={{margin:"0 0 5px",fontSize:9,color:C.muted,fontFamily:FC,letterSpacing:"0.12em",textTransform:"uppercase"}}>REPS IN RESERVE</p>
+    <p style={{margin:"0 0 5px",fontSize:11,color:C.muted,fontFamily:FC,letterSpacing:"0.12em",textTransform:"uppercase"}}>REPS IN RESERVE</p>
     <div style={{display:"flex",gap:5}}>
       {[{v:"0",l:"0",s:"Failure",c:C.red},{v:"1",l:"1",s:"1 left",c:C.orange},{v:"2",l:"2",s:"2 left",c:C.yellow},{v:"3",l:"3+",s:"Easy",c:C.green}].map(o=>(
         <button key={o.v} onClick={()=>onChange(o.v)} style={{flex:1,padding:"7px 2px",borderRadius:7,background:value===o.v?o.c:"transparent",border:`1px solid ${value===o.v?o.c:C.border}`,cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:1}}>
@@ -1301,7 +1340,7 @@ const MealBlock=({section,title,emoji,pc})=>{
           <span style={{fontSize:22}}>{emoji}</span>
           <div style={{textAlign:"left"}}>
             <p style={{margin:0,fontSize:16,fontFamily:FC,fontWeight:700,color:C.text}}>{title}</p>
-            <p style={{margin:0,fontSize:10,color:pc,fontFamily:FC,letterSpacing:"0.1em"}}>{section.time}</p>
+            <p style={{margin:0,fontSize:12,color:pc,fontFamily:FC,letterSpacing:"0.1em"}}>{section.time}</p>
           </div>
         </div>
         <span style={{color:C.muted,fontSize:14}}>{open?"^":"v"}</span>
@@ -1310,31 +1349,31 @@ const MealBlock=({section,title,emoji,pc})=>{
         <div style={{padding:"0 12px 14px"}}>
           <div style={{background:C.surface,borderRadius:8,overflow:"hidden",marginBottom:8,border:`1px solid ${C.border}`}}>
             <div style={{display:"flex",alignItems:"center",background:C.dim,padding:"6px 10px",borderBottom:`1px solid ${C.border}`}}>
-              <div style={{flex:1,fontSize:9,color:C.muted,fontFamily:FC,letterSpacing:"0.1em"}}>ITEM</div>
-              {["CAL","P","C","F"].map(h=>(<div key={h} style={{width:38,fontSize:9,color:C.muted,fontFamily:FC,textAlign:"center"}}>{h}</div>))}
+              <div style={{flex:1,fontSize:11,color:C.muted,fontFamily:FC,letterSpacing:"0.1em"}}>ITEM</div>
+              {["CAL","P","C","F"].map(h=>(<div key={h} style={{width:38,fontSize:11,color:C.muted,fontFamily:FC,textAlign:"center"}}>{h}</div>))}
             </div>
             {section.items.map((item,i)=>(
               <div key={i} style={{display:"flex",alignItems:"center",padding:"9px 10px",borderBottom:i<section.items.length-1?`1px solid ${C.border}33`:"none",background:i%2===0?"transparent":"#ffffff06"}}>
                 <div style={{flex:1,minWidth:0,paddingRight:8}}>
-                  <p style={{margin:0,fontSize:11,fontFamily:FC,fontWeight:700,color:item.xs?C.red:C.text,lineHeight:1.3}}>{item.l}</p>
-                  <p style={{margin:"2px 0 0",fontSize:10,color:C.muted,fontFamily:FB,lineHeight:1.3}}>{item.d}</p>
+                  <p style={{margin:0,fontSize:12,fontFamily:FC,fontWeight:700,color:item.xs?C.red:C.text,lineHeight:1.3}}>{item.l}</p>
+                  <p style={{margin:"2px 0 0",fontSize:12,color:C.muted,fontFamily:FB,lineHeight:1.3}}>{item.d}</p>
                 </div>
-                <div style={{width:38,textAlign:"center",flexShrink:0}}><span style={{fontSize:11,fontFamily:FC,fontWeight:"bold",color:C.yellow}}>{item.cal}</span></div>
-                <div style={{width:38,textAlign:"center",flexShrink:0}}><span style={{fontSize:11,fontFamily:FC,fontWeight:"bold",color:C.green}}>{item.p}g</span></div>
-                <div style={{width:38,textAlign:"center",flexShrink:0}}><span style={{fontSize:11,fontFamily:FC,fontWeight:"bold",color:C.blue}}>{item.c}g</span></div>
-                <div style={{width:38,textAlign:"center",flexShrink:0}}><span style={{fontSize:11,fontFamily:FC,fontWeight:"bold",color:C.steel}}>{item.f}g</span></div>
+                <div style={{width:38,textAlign:"center",flexShrink:0}}><span style={{fontSize:12,fontFamily:FC,fontWeight:"bold",color:C.yellow}}>{item.cal}</span></div>
+                <div style={{width:38,textAlign:"center",flexShrink:0}}><span style={{fontSize:12,fontFamily:FC,fontWeight:"bold",color:C.green}}>{item.p}g</span></div>
+                <div style={{width:38,textAlign:"center",flexShrink:0}}><span style={{fontSize:12,fontFamily:FC,fontWeight:"bold",color:C.blue}}>{item.c}g</span></div>
+                <div style={{width:38,textAlign:"center",flexShrink:0}}><span style={{fontSize:12,fontFamily:FC,fontWeight:"bold",color:C.steel}}>{item.f}g</span></div>
               </div>
             ))}
           </div>
           {section.supps&&section.supps.length>0&&(
             <div style={{background:C.green+"11",borderRadius:8,padding:"8px 12px",marginBottom:8,border:`1px solid ${C.green}33`}}>
-              <p style={{margin:"0 0 5px",fontSize:9,color:C.greenBright,fontFamily:FC,letterSpacing:"0.15em",textTransform:"uppercase"}}>Supplements with this meal</p>
+              <p style={{margin:"0 0 5px",fontSize:11,color:C.greenBright,fontFamily:FC,letterSpacing:"0.15em",textTransform:"uppercase"}}>Supplements with this meal</p>
               <div style={{display:"flex",flexWrap:"wrap",gap:4}}>
-                {section.supps.map((s,i)=>(<span key={i} style={{fontSize:10,padding:"3px 9px",borderRadius:12,background:C.green+"22",color:C.greenBright,border:`1px solid ${C.green}44`,fontFamily:FC}}>{s}</span>))}
+                {section.supps.map((s,i)=>(<span key={i} style={{fontSize:12,padding:"3px 9px",borderRadius:12,background:C.green+"22",color:C.greenBright,border:`1px solid ${C.green}44`,fontFamily:FC}}>{s}</span>))}
               </div>
             </div>
           )}
-          <p style={{margin:0,fontSize:11,color:C.muted,fontStyle:"italic",fontFamily:FB,lineHeight:1.5}}>{section.note}</p>
+          <p style={{margin:0,fontSize:12,color:C.muted,fontStyle:"italic",fontFamily:FB,lineHeight:1.5}}>{section.note}</p>
         </div>
       )}
     </div>
@@ -1349,20 +1388,20 @@ const SuppCard=({s,showCaff})=>{
       <button onClick={()=>setOpen(!open)} style={{width:"100%",background:"none",border:"none",cursor:"pointer",padding:"12px 14px",display:"flex",justifyContent:"space-between",alignItems:"flex-start",textAlign:"left",gap:8}}>
         <div style={{flex:1}}>
           <p style={{margin:0,fontSize:13,fontFamily:FC,fontWeight:700,color:s.color}}>{s.name}</p>
-          <p style={{margin:"2px 0 0",fontSize:10,color:C.muted,fontFamily:FB}}>{s.timing}</p>
+          <p style={{margin:"2px 0 0",fontSize:12,color:C.muted,fontFamily:FB}}>{s.timing}</p>
         </div>
         <div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
-          {showCaff&&s.caff>0&&<span style={{fontSize:9,padding:"2px 7px",borderRadius:4,background:C.red+"22",color:C.red,fontFamily:FC,fontWeight:700}}>{s.caff}mg</span>}
+          {showCaff&&s.caff>0&&<span style={{fontSize:11,padding:"2px 7px",borderRadius:4,background:C.red+"22",color:C.red,fontFamily:FC,fontWeight:700}}>{s.caff}mg</span>}
           <span style={{color:C.muted,fontSize:14}}>{open?"^":"v"}</span>
         </div>
       </button>
       {open&&(
         <div style={{padding:"0 14px 12px"}}>
-          <p style={{margin:"0 0 8px",fontSize:10,color:C.muted,fontFamily:FC,letterSpacing:"0.15em",textTransform:"uppercase"}}>Ingredients</p>
-          {(s.ingredients||[]).map((ing,j)=>(<p key={j} style={{margin:"0 0 4px",fontSize:11,color:C.steel,fontFamily:FB,lineHeight:1.4,paddingLeft:8,borderLeft:`2px solid ${s.color}44`}}>{ing}</p>))}
+          <p style={{margin:"0 0 8px",fontSize:12,color:C.muted,fontFamily:FC,letterSpacing:"0.15em",textTransform:"uppercase"}}>Ingredients</p>
+          {(s.ingredients||[]).map((ing,j)=>(<p key={j} style={{margin:"0 0 4px",fontSize:12,color:C.steel,fontFamily:FB,lineHeight:1.4,paddingLeft:8,borderLeft:`2px solid ${s.color}44`}}>{ing}</p>))}
           <div style={{background:C.surface,borderRadius:8,padding:"8px 10px",marginTop:8}}>
-            <p style={{margin:"0 0 3px",fontSize:9,color:s.color,fontFamily:FC,letterSpacing:"0.1em",textTransform:"uppercase"}}>Dose: {s.dose}</p>
-            <p style={{margin:0,fontSize:11,color:C.muted,fontStyle:"italic",fontFamily:FB,lineHeight:1.4}}>{s.why}</p>
+            <p style={{margin:"0 0 3px",fontSize:11,color:s.color,fontFamily:FC,letterSpacing:"0.1em",textTransform:"uppercase"}}>Dose: {s.dose}</p>
+            <p style={{margin:0,fontSize:12,color:C.muted,fontStyle:"italic",fontFamily:FB,lineHeight:1.4}}>{s.why}</p>
           </div>
         </div>
       )}
@@ -1449,24 +1488,24 @@ const LogModal=({ex,pc,lastSets,targets,week,phase,allHistory,onSave,onClose})=>
         {/* Header */}
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:12}}>
           <div style={{flex:1,paddingRight:8}}>
-            <p style={{margin:0,fontSize:10,color:pc,letterSpacing:"0.2em",textTransform:"uppercase",fontFamily:FC}}>
+            <p style={{margin:0,fontSize:12,color:pc,letterSpacing:"0.2em",textTransform:"uppercase",fontFamily:FC}}>
               {baseline?"WEEK 1 - SET BASELINE":"WEEK "+(week||1)+" TARGETS"}
             </p>
             <p style={{margin:"2px 0 4px",fontSize:17,fontWeight:"bold",fontFamily:FC}}>{ex.n}</p>
             <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
-              <span style={{fontSize:9,padding:"2px 8px",borderRadius:4,background:pc+"22",color:pc,fontFamily:FC}}>
+              <span style={{fontSize:11,padding:"2px 8px",borderRadius:4,background:pc+"22",color:pc,fontFamily:FC}}>
                 {ex.s} sets x {ex.r}{typeof ex.r==="number"?" reps":""}
               </span>
-              <span style={{fontSize:9,padding:"2px 8px",borderRadius:4,background:C.surface,color:C.muted,fontFamily:FC}}>
+              <span style={{fontSize:11,padding:"2px 8px",borderRadius:4,background:C.surface,color:C.muted,fontFamily:FC}}>
                 {compound?"Compound 2.5min":"Isolation 60s"}
               </span>
-              {phase>=1&&!deloadWeek&&<span style={{fontSize:9,padding:"2px 8px",borderRadius:4,background:C.red+"22",color:C.red,fontFamily:FC}}>BURNOUT</span>}
-              {deloadWeek&&<span style={{fontSize:9,padding:"2px 8px",borderRadius:4,background:C.yellow+"22",color:C.yellow,fontFamily:FC}}>DELOAD 60%</span>}
+              {phase>=1&&!deloadWeek&&<span style={{fontSize:11,padding:"2px 8px",borderRadius:4,background:C.red+"22",color:C.red,fontFamily:FC}}>BURNOUT</span>}
+              {deloadWeek&&<span style={{fontSize:11,padding:"2px 8px",borderRadius:4,background:C.yellow+"22",color:C.yellow,fontFamily:FC}}>DELOAD 60%</span>}
             </div>
           </div>
           <div style={{display:"flex",gap:6,flexShrink:0}}>
             {allHistory&&allHistory.length>0&&(
-              <button onClick={()=>setShowHistory(!showHistory)} style={{background:C.surface,border:`1px solid ${C.border}`,borderRadius:8,padding:"6px 8px",cursor:"pointer",fontSize:9,color:C.steel,fontFamily:FC}}>
+              <button onClick={()=>setShowHistory(!showHistory)} style={{background:C.surface,border:`1px solid ${C.border}`,borderRadius:8,padding:"6px 8px",cursor:"pointer",fontSize:11,color:C.steel,fontFamily:FC}}>
                 HISTORY
               </button>
             )}
@@ -1479,7 +1518,7 @@ const LogModal=({ex,pc,lastSets,targets,week,phase,allHistory,onSave,onClose})=>
         {/* Exercise history */}
         {showHistory&&allHistory&&(
           <div style={{background:C.surface,borderRadius:10,padding:"12px 14px",marginBottom:12,border:`1px solid ${C.border}`}}>
-            <p style={{margin:"0 0 8px",fontSize:11,color:C.yellow,fontFamily:FC,letterSpacing:"0.1em",textTransform:"uppercase"}}>Exercise History</p>
+            <p style={{margin:"0 0 8px",fontSize:12,color:C.yellow,fontFamily:FC,letterSpacing:"0.1em",textTransform:"uppercase"}}>Exercise History</p>
             {allHistory.map((wkSets,i)=>{
               const ws=(wkSets||[]).filter(s=>!s.isWarmup&&!s.isBurnout);
               const rm=ws[0]?calc1RM(ws[0].w,ws[0].r):0;
@@ -1487,15 +1526,15 @@ const LogModal=({ex,pc,lastSets,targets,week,phase,allHistory,onSave,onClose})=>
               return(
                 <div key={i} style={{marginBottom:6,paddingBottom:6,borderBottom:i<allHistory.length-1?`1px solid ${C.border}22`:"none"}}>
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:3}}>
-                    <span style={{fontSize:11,fontFamily:FC,color:C.muted}}>Week {i+1}</span>
+                    <span style={{fontSize:12,fontFamily:FC,color:C.muted}}>Week {i+1}</span>
                     <div style={{display:"flex",gap:8}}>
-                      {rm>0&&<span style={{fontSize:10,fontFamily:FC,color:C.yellow}}>~1RM: {rm}lb</span>}
-                      {v>0&&<span style={{fontSize:10,fontFamily:FC,color:C.steel}}>{Math.round(v).toLocaleString()}lb vol</span>}
+                      {rm>0&&<span style={{fontSize:12,fontFamily:FC,color:C.yellow}}>~1RM: {rm}lb</span>}
+                      {v>0&&<span style={{fontSize:12,fontFamily:FC,color:C.steel}}>{Math.round(v).toLocaleString()}lb vol</span>}
                     </div>
                   </div>
                   <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
                     {ws.map((s,j)=>(
-                      <span key={j} style={{fontSize:9,padding:"2px 7px",borderRadius:5,background:C.card,color:C.steel,fontFamily:FC}}>
+                      <span key={j} style={{fontSize:11,padding:"2px 7px",borderRadius:5,background:C.card,color:C.steel,fontFamily:FC}}>
                         {s.w?`${s.w}lb`:"BW"} x {s.r}{s.rir!==undefined&&s.rir!==""?` RIR${s.rir}`:""}
                       </span>
                     ))}
@@ -1509,7 +1548,7 @@ const LogModal=({ex,pc,lastSets,targets,week,phase,allHistory,onSave,onClose})=>
         {/* Baseline notice */}
         {baseline&&(
           <div style={{background:C.yellow+"22",borderRadius:8,padding:"9px 12px",marginBottom:12,border:`1px solid ${C.yellow}44`}}>
-            <p style={{margin:0,fontSize:11,color:C.yellow,fontFamily:FB,lineHeight:1.5}}>
+            <p style={{margin:0,fontSize:12,color:C.yellow,fontFamily:FB,lineHeight:1.5}}>
               Week 1 - Log your real working weights. Week 2+ calculates targets automatically. Hit all reps + RIR 0-1 = weight goes up. Miss reps = same weight repeated.
             </p>
           </div>
@@ -1519,21 +1558,21 @@ const LogModal=({ex,pc,lastSets,targets,week,phase,allHistory,onSave,onClose})=>
         {showWarmups&&suggestedWarmups.length>0&&!warmupsLogged&&(
           <div style={{background:C.surface,borderRadius:10,padding:"12px 14px",marginBottom:12,border:`1px solid ${C.border}`}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
-              <p style={{margin:0,fontSize:11,fontFamily:FC,color:C.steel,letterSpacing:"0.1em",textTransform:"uppercase"}}>Warm-Up Sets</p>
-              <button onClick={()=>setShowWarmups(false)} style={{background:"none",border:"none",cursor:"pointer",fontSize:10,color:C.muted,fontFamily:FC}}>SKIP</button>
+              <p style={{margin:0,fontSize:12,fontFamily:FC,color:C.steel,letterSpacing:"0.1em",textTransform:"uppercase"}}>Warm-Up Sets</p>
+              <button onClick={()=>setShowWarmups(false)} style={{background:"none",border:"none",cursor:"pointer",fontSize:12,color:C.muted,fontFamily:FC}}>SKIP</button>
             </div>
             {suggestedWarmups.map((wu,i)=>(
               <div key={i} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"7px 0",borderBottom:i<suggestedWarmups.length-1?`1px solid ${C.border}33`:"none"}}>
-                <span style={{fontSize:11,color:C.muted,fontFamily:FC}}>{wu.label}</span>
+                <span style={{fontSize:12,color:C.muted,fontFamily:FC}}>{wu.label}</span>
                 <div style={{display:"flex",gap:10,alignItems:"center"}}>
                   <span style={{fontSize:13,fontWeight:"bold",fontFamily:FC,color:C.steel}}>{wu.w}lb x {wu.r}</span>
                   {i===warmupIdx&&(
                     <button onClick={()=>{if(i===suggestedWarmups.length-1)setWarmupsLogged(true);else setWarmupIdx(i+1);}}
-                      style={{background:C.steel+"33",border:`1px solid ${C.steel}44`,borderRadius:6,padding:"4px 10px",fontSize:10,color:C.steel,cursor:"pointer",fontFamily:FC}}>
+                      style={{background:C.steel+"33",border:`1px solid ${C.steel}44`,borderRadius:6,padding:"4px 10px",fontSize:12,color:C.steel,cursor:"pointer",fontFamily:FC}}>
                       DONE
                     </button>
                   )}
-                  {i<warmupIdx&&<span style={{fontSize:10,color:C.green,fontFamily:FC}}>done</span>}
+                  {i<warmupIdx&&<span style={{fontSize:12,color:C.green,fontFamily:FC}}>done</span>}
                 </div>
               </div>
             ))}
@@ -1553,12 +1592,12 @@ const LogModal=({ex,pc,lastSets,targets,week,phase,allHistory,onSave,onClose})=>
               transition:"all 0.3s"}}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
                 <div style={{display:"flex",alignItems:"center",gap:8}}>
-                  <span style={{fontSize:11,fontFamily:FC,fontWeight:700,color:isActive?pc:C.muted,letterSpacing:"0.1em"}}>SET {i+1}</span>
-                  {isActive&&!s.logged&&<span style={{fontSize:9,padding:"2px 7px",borderRadius:4,background:pc,color:"#000",fontFamily:FC,fontWeight:700}}>ACTIVE</span>}
-                  {s.logged&&status!=="base"&&<span style={{fontSize:9,padding:"2px 7px",borderRadius:4,background:sc+"22",color:sc,fontFamily:FC}}>{SL[status]}</span>}
+                  <span style={{fontSize:12,fontFamily:FC,fontWeight:700,color:isActive?pc:C.muted,letterSpacing:"0.1em"}}>SET {i+1}</span>
+                  {isActive&&!s.logged&&<span style={{fontSize:11,padding:"2px 7px",borderRadius:4,background:pc,color:"#000",fontFamily:FC,fontWeight:700}}>ACTIVE</span>}
+                  {s.logged&&status!=="base"&&<span style={{fontSize:11,padding:"2px 7px",borderRadius:4,background:sc+"22",color:sc,fontFamily:FC}}>{SL[status]}</span>}
                 </div>
                 {target&&!baseline&&(
-                  <span style={{fontSize:10,color:C.muted,fontFamily:FC}}>
+                  <span style={{fontSize:12,color:C.muted,fontFamily:FC}}>
                     Target: {target.isBurnout?"BURNOUT":target.w+"lb x "+target.r}
                   </span>
                 )}
@@ -1566,14 +1605,14 @@ const LogModal=({ex,pc,lastSets,targets,week,phase,allHistory,onSave,onClose})=>
               <div style={{display:"flex",gap:8}}>
                 {!ex.nw&&(
                   <div style={{flex:1}}>
-                    <p style={{margin:"0 0 4px",fontSize:9,color:C.muted,fontFamily:FC,letterSpacing:"0.1em"}}>WEIGHT (lbs)</p>
+                    <p style={{margin:"0 0 4px",fontSize:11,color:C.muted,fontFamily:FC,letterSpacing:"0.1em"}}>WEIGHT (lbs)</p>
                     <input value={s.w} onChange={e=>upd(i,"w",e.target.value)}
                       placeholder={target&&!baseline?target.w:"0"} type="number"
                       style={{width:"100%",background:C.bg,border:`1px solid ${isActive?pc+"88":C.border}`,borderRadius:8,padding:"10px",color:C.text,fontSize:20,fontFamily:FC,outline:"none",textAlign:"center",fontWeight:"bold"}}/>
                   </div>
                 )}
                 <div style={{flex:1}}>
-                  <p style={{margin:"0 0 4px",fontSize:9,color:C.muted,fontFamily:FC,letterSpacing:"0.1em"}}>REPS</p>
+                  <p style={{margin:"0 0 4px",fontSize:11,color:C.muted,fontFamily:FC,letterSpacing:"0.1em"}}>REPS</p>
                   <input value={s.r} onChange={e=>upd(i,"r",e.target.value)}
                     placeholder={target&&!baseline?target.r:typeof ex.r==="number"?String(ex.r):ex.r||"0"}
                     style={{width:"100%",background:C.bg,border:`1px solid ${isActive?pc+"88":C.border}`,borderRadius:8,padding:"10px",color:C.text,fontSize:20,fontFamily:FC,outline:"none",textAlign:"center",fontWeight:"bold"}}/>
@@ -1595,16 +1634,16 @@ const LogModal=({ex,pc,lastSets,targets,week,phase,allHistory,onSave,onClose})=>
           <div style={{background:C.surface,borderRadius:10,padding:"10px 14px",marginBottom:8,display:"flex",gap:12,border:`1px solid ${C.border}`}}>
             {current1RM&&(
               <div style={{flex:1,textAlign:"center"}}>
-                <p style={{margin:0,fontSize:9,color:C.muted,fontFamily:FC,letterSpacing:"0.1em"}}>EST 1RM</p>
+                <p style={{margin:0,fontSize:11,color:C.muted,fontFamily:FC,letterSpacing:"0.1em"}}>EST 1RM</p>
                 <p style={{margin:0,fontSize:18,fontWeight:"bold",fontFamily:FD,color:isPR?C.yellow:C.text}}>
                   {current1RM}lb {isPR&&"PR!"}
                 </p>
-                {isPR&&<p style={{margin:0,fontSize:9,color:C.yellow,fontFamily:FC}}>NEW RECORD +{current1RM-prev1RM}lb</p>}
+                {isPR&&<p style={{margin:0,fontSize:11,color:C.yellow,fontFamily:FC}}>NEW RECORD +{current1RM-prev1RM}lb</p>}
               </div>
             )}
             {vol>0&&(
               <div style={{flex:1,textAlign:"center",borderLeft:`1px solid ${C.border}`,paddingLeft:12}}>
-                <p style={{margin:0,fontSize:9,color:C.muted,fontFamily:FC,letterSpacing:"0.1em"}}>SESSION VOLUME</p>
+                <p style={{margin:0,fontSize:11,color:C.muted,fontFamily:FC,letterSpacing:"0.1em"}}>SESSION VOLUME</p>
                 <p style={{margin:0,fontSize:18,fontWeight:"bold",fontFamily:FD,color:C.steel}}>{Math.round(vol).toLocaleString()}lb</p>
               </div>
             )}
@@ -1618,7 +1657,7 @@ const LogModal=({ex,pc,lastSets,targets,week,phase,allHistory,onSave,onClose})=>
         {phase>=1&&!deloadWeek&&sets.every(s=>s.logged)&&!showBurnout&&(
           <div style={{background:C.red+"22",borderRadius:10,padding:"14px",border:`1px solid ${C.red}66`,marginTop:8}}>
             <p style={{margin:"0 0 4px",fontSize:16,fontWeight:600,fontFamily:FD,color:C.red}}>Burnout Set</p>
-            <p style={{margin:"0 0 10px",fontSize:11,color:C.muted,fontFamily:FB,lineHeight:1.5}}>
+            <p style={{margin:"0 0 10px",fontSize:12,color:C.muted,fontFamily:FB,lineHeight:1.5}}>
               {burnoutReady?"REST DONE. Drop 30%. Go to absolute failure. Every last rep.":"Rest 3 min then go to absolute failure. Drop 30% of working weight."}
             </p>
             {burnoutReady&&(
@@ -1635,14 +1674,14 @@ const LogModal=({ex,pc,lastSets,targets,week,phase,allHistory,onSave,onClose})=>
             <div style={{display:"flex",gap:8,marginBottom:8}}>
               {!ex.nw&&(
                 <div style={{flex:1}}>
-                  <p style={{margin:"0 0 4px",fontSize:9,color:C.red,fontFamily:FC}}>WEIGHT (-30%)</p>
+                  <p style={{margin:"0 0 4px",fontSize:11,color:C.red,fontFamily:FC}}>WEIGHT (-30%)</p>
                   <input value={burnout.w} onChange={e=>updB("w",e.target.value)}
                     placeholder={sets[0]?.w?String(Math.round(parseFloat(sets[0].w)*0.7)):""}
                     type="number" style={{width:"100%",background:C.bg,border:`1px solid ${C.red}`,borderRadius:8,padding:"10px",color:C.red,fontSize:20,fontFamily:FC,outline:"none",textAlign:"center",fontWeight:"bold"}}/>
                 </div>
               )}
               <div style={{flex:1}}>
-                <p style={{margin:"0 0 4px",fontSize:9,color:C.red,fontFamily:FC}}>REPS TO FAILURE</p>
+                <p style={{margin:"0 0 4px",fontSize:11,color:C.red,fontFamily:FC}}>REPS TO FAILURE</p>
                 <input value={burnout.r} onChange={e=>updB("r",e.target.value)}
                   placeholder="MAX" style={{width:"100%",background:C.bg,border:`1px solid ${C.red}`,borderRadius:8,padding:"10px",color:C.red,fontSize:20,fontFamily:FC,outline:"none",textAlign:"center",fontWeight:"bold"}}/>
               </div>
@@ -1657,7 +1696,7 @@ const LogModal=({ex,pc,lastSets,targets,week,phase,allHistory,onSave,onClose})=>
 
         {/* Session note */}
         <div style={{marginTop:10}}>
-          <p style={{margin:"0 0 4px",fontSize:9,color:C.muted,fontFamily:FC,letterSpacing:"0.1em",textTransform:"uppercase"}}>Session Notes (optional)</p>
+          <p style={{margin:"0 0 4px",fontSize:11,color:C.muted,fontFamily:FC,letterSpacing:"0.1em",textTransform:"uppercase"}}>Session Notes (optional)</p>
           <input value={sessionNote} onChange={e=>setSessionNote(e.target.value)}
             placeholder="Shoulder felt tight, energy was low, new PR..."
             style={{width:"100%",background:C.surface,border:`1px solid ${C.border}`,borderRadius:8,padding:"9px 12px",color:C.text,fontSize:13,fontFamily:FB,outline:"none",boxSizing:"border-box"}}/>
@@ -1712,24 +1751,24 @@ const SessionComplete=({wo,data,ph,di,week,onClose})=>{
         </div>
         <div style={{display:"flex",gap:8,marginBottom:16}}>
           <div style={{flex:1,background:C.surface,borderRadius:10,padding:"12px",textAlign:"center",borderTop:`2px solid ${PHASES[ph].color}`}}>
-            <p style={{margin:0,fontSize:9,color:C.muted,fontFamily:FC,letterSpacing:"0.1em"}}>EXERCISES</p>
+            <p style={{margin:0,fontSize:11,color:C.muted,fontFamily:FC,letterSpacing:"0.1em"}}>EXERCISES</p>
             <p style={{margin:0,fontSize:22,fontFamily:FD,color:PHASES[ph].color}}>{doneCount}/{exercises.length}</p>
           </div>
           <div style={{flex:1,background:C.surface,borderRadius:10,padding:"12px",textAlign:"center",borderTop:`2px solid ${C.yellow}`}}>
-            <p style={{margin:0,fontSize:9,color:C.muted,fontFamily:FC,letterSpacing:"0.1em"}}>VOLUME</p>
+            <p style={{margin:0,fontSize:11,color:C.muted,fontFamily:FC,letterSpacing:"0.1em"}}>VOLUME</p>
             <p style={{margin:0,fontSize:22,fontFamily:FD,color:C.yellow}}>
                   {totalVol>=1000?Math.round(totalVol/1000).toFixed(1)+"K":Math.round(totalVol)} lb
                 </p>
           </div>
           <div style={{flex:1,background:C.surface,borderRadius:10,padding:"12px",textAlign:"center",borderTop:`2px solid ${C.red}`}}>
-            <p style={{margin:0,fontSize:9,color:C.muted,fontFamily:FC,letterSpacing:"0.1em"}}>PRs</p>
+            <p style={{margin:0,fontSize:11,color:C.muted,fontFamily:FC,letterSpacing:"0.1em"}}>PRs</p>
             <p style={{margin:0,fontSize:22,fontFamily:FD,color:C.red}}>{PRs.length}</p>
           </div>
         </div>
         {week===1&&totalVol>0&&(
           <div style={{background:C.blue+"22",borderRadius:10,padding:"12px 14px",marginBottom:12,border:`1px solid ${C.blue}44`}}>
             <p style={{margin:"0 0 4px",fontSize:12,fontFamily:FD,color:C.blueBright,letterSpacing:"0.05em"}}>BASELINE SET</p>
-            <p style={{margin:0,fontSize:11,color:C.muted,fontFamily:FB,lineHeight:1.5}}>Week 1 baselines locked in. Week 2 targets calculate automatically from today's weights. PRs start from Week 2.</p>
+            <p style={{margin:0,fontSize:12,color:C.muted,fontFamily:FB,lineHeight:1.5}}>Week 1 baselines locked in. Week 2 targets calculate automatically from today's weights. PRs start from Week 2.</p>
           </div>
         )}
         {PRs.length>0&&week>1&&(
@@ -1737,18 +1776,18 @@ const SessionComplete=({wo,data,ph,di,week,onClose})=>{
             <p style={{margin:"0 0 8px",fontSize:12,fontFamily:FD,color:C.yellow,letterSpacing:"0.05em"}}>NEW PERSONAL RECORDS</p>
             {PRs.map((pr,i)=>(
               <div key={i} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"5px 0",borderBottom:i<PRs.length-1?`1px solid ${C.yellow}22`:"none"}}>
-                <span style={{fontSize:11,color:C.text,fontFamily:FC}}>{pr.name}</span>
+                <span style={{fontSize:12,color:C.text,fontFamily:FC}}>{pr.name}</span>
                 <div style={{textAlign:"right"}}>
                   <span style={{fontSize:13,fontWeight:"bold",color:C.yellow,fontFamily:FC}}>{pr.rm}lb 1RM</span>
-                  <span style={{fontSize:10,color:C.greenBright,fontFamily:FC,marginLeft:8}}>+{pr.gain}lb</span>
+                  <span style={{fontSize:12,color:C.greenBright,fontFamily:FC,marginLeft:8}}>+{pr.gain}lb</span>
                 </div>
               </div>
             ))}
           </div>
         )}
         <div style={{background:C.surface,borderRadius:10,padding:"10px 14px",marginBottom:16,border:`1px solid ${C.border}`}}>
-          <p style={{margin:0,fontSize:11,color:C.muted,fontFamily:FB}}>Next: <span style={{color:C.text,fontWeight:"bold"}}>{nextDay}</span></p>
-          {isDeload(week+1)&&<p style={{margin:"4px 0 0",fontSize:11,color:C.yellow,fontFamily:FB}}>Week {week+1} is a DELOAD week - 60% volume, same weights. Recovery is gains.</p>}
+          <p style={{margin:0,fontSize:12,color:C.muted,fontFamily:FB}}>Next: <span style={{color:C.text,fontWeight:"bold"}}>{nextDay}</span></p>
+          {isDeload(week+1)&&<p style={{margin:"4px 0 0",fontSize:12,color:C.yellow,fontFamily:FB}}>Week {week+1} is a DELOAD week - 60% volume, same weights. Recovery is gains.</p>}
         </div>
         <button onClick={onClose}
           style={{width:"100%",background:PHASES[ph].color,color:"#000",border:"none",borderRadius:10,padding:"14px",fontSize:15,fontWeight:"bold",cursor:"pointer",fontFamily:FC,letterSpacing:"0.1em",textTransform:"uppercase"}}>
@@ -1799,7 +1838,7 @@ const LoginScreen = ({onLogin}) => {
 
       {/* User selection */}
       <div style={{width:"100%",marginBottom:24,position:"relative"}}>
-        <p style={{margin:"0 0 12px",fontSize:10,color:C.muted,letterSpacing:"0.18em",textTransform:"uppercase",fontFamily:FC,textAlign:"center"}}>Who's training?</p>
+        <p style={{margin:"0 0 12px",fontSize:12,color:C.muted,letterSpacing:"0.18em",textTransform:"uppercase",fontFamily:FC,textAlign:"center"}}>Who's training?</p>
         <div style={{display:"flex",gap:10}}>
           {Object.entries(USERS).map(([p, u]) => (
             <button key={p} onClick={() => { setSelectedUser(p); setPin(""); setError(""); }}
@@ -1810,7 +1849,7 @@ const LoginScreen = ({onLogin}) => {
                 transition:"all 0.2s"}}>
                 <p style={{margin:0,fontSize:17,fontWeight:600,fontFamily:FD,letterSpacing:"-0.005em",
                 color: selectedUser===p ? C.yellow : C.text}}>{u.name}</p>
-                <p style={{margin:"4px 0 0",fontSize:10,color:C.muted,fontFamily:FB,lineHeight:1.35}}>{u.tagline}</p>
+                <p style={{margin:"4px 0 0",fontSize:12,color:C.muted,fontFamily:FB,lineHeight:1.35}}>{u.tagline}</p>
             </button>
           ))}
         </div>
@@ -1819,7 +1858,7 @@ const LoginScreen = ({onLogin}) => {
       {/* PIN display */}
       {selectedUser && (
         <div style={{width:"100%",position:"relative"}}>
-          <p style={{margin:"0 0 10px",fontSize:10,color:C.muted,letterSpacing:"0.18em",textTransform:"uppercase",fontFamily:FC,textAlign:"center"}}>Enter PIN</p>
+          <p style={{margin:"0 0 10px",fontSize:12,color:C.muted,letterSpacing:"0.18em",textTransform:"uppercase",fontFamily:FC,textAlign:"center"}}>Enter PIN</p>
           <div style={{display:"flex",gap:12,justifyContent:"center",marginBottom:8}}>
             {[0,1,2,3].map(i => (
               <div key={i} style={{width:14,height:14,borderRadius:"50%",
@@ -1858,7 +1897,7 @@ const GoalsPanel=({selected,onToggle,onClose})=>(
   <div style={{position:"fixed",inset:0,zIndex:300,display:"flex",alignItems:"flex-end",background:"rgba(0,0,0,0.9)"}} onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
     <div style={{width:"100%",maxWidth:430,margin:"0 auto",background:C.card,borderRadius:"16px 16px 0 0",padding:"24px 20px calc(40px + env(safe-area-inset-bottom))",maxHeight:"80vh",overflowY:"auto"}}>
       <p style={{margin:"0 0 4px",fontSize:20,fontWeight:600,fontFamily:FD,color:C.yellow}}>Your Goals</p>
-      <p style={{margin:"0 0 16px",fontSize:11,color:C.muted,fontFamily:FB}}>Pick what you're training toward. This shapes what gets recommended in Mobility and Skills.</p>
+      <p style={{margin:"0 0 16px",fontSize:12,color:C.muted,fontFamily:FB}}>Pick what you're training toward. This shapes what gets recommended in Mobility and Skills.</p>
       <div style={{display:"flex",flexWrap:"wrap",gap:8,marginBottom:20}}>
         {GOALS.map(g=>{
           const on=selected.includes(g.id);
@@ -1895,7 +1934,7 @@ const AssessmentFlow=({onComplete,onClose})=>{
     <div style={{position:"fixed",inset:0,zIndex:300,display:"flex",alignItems:"flex-end",background:"rgba(0,0,0,0.92)"}} onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
       <div style={{width:"100%",maxWidth:430,margin:"0 auto",background:C.card,borderRadius:"16px 16px 0 0",padding:"24px 20px calc(40px + env(safe-area-inset-bottom))"}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
-          <p style={{margin:0,fontSize:10,color:C.muted,letterSpacing:"0.2em",fontFamily:FC}}>BASELINE ASSESSMENT · {step+1}/{ASSESSMENT_QUESTIONS.length}</p>
+          <p style={{margin:0,fontSize:12,color:C.muted,letterSpacing:"0.2em",fontFamily:FC}}>BASELINE ASSESSMENT · {step+1}/{ASSESSMENT_QUESTIONS.length}</p>
           <button onClick={onClose} style={{background:"none",border:"none",color:C.muted,fontSize:18,cursor:"pointer"}}>×</button>
         </div>
         <p style={{margin:"8px 0 4px",fontSize:22,fontFamily:FD,color:C.yellow}}>{q.label}</p>
@@ -1909,7 +1948,7 @@ const AssessmentFlow=({onComplete,onClose})=>{
           ))}
         </div>
         {step>0&&(
-          <button onClick={()=>setStep(step-1)} style={{marginTop:12,background:"none",border:`1px solid ${C.border}`,borderRadius:8,padding:"9px 14px",fontSize:11,color:C.steel,cursor:"pointer",fontFamily:FC}}>← BACK</button>
+          <button onClick={()=>setStep(step-1)} style={{marginTop:12,background:"none",border:`1px solid ${C.border}`,borderRadius:8,padding:"9px 14px",fontSize:12,color:C.steel,cursor:"pointer",fontFamily:FC}}>← BACK</button>
         )}
       </div>
     </div>
@@ -1930,7 +1969,7 @@ const RoutineRunner=({routine,onComplete,onClose})=>{
     <div style={{position:"fixed",inset:0,zIndex:300,display:"flex",alignItems:"flex-end",background:"rgba(0,0,0,0.92)"}} onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
       <div style={{width:"100%",maxWidth:430,margin:"0 auto",background:C.card,borderRadius:"16px 16px 0 0",padding:"24px 20px calc(40px + env(safe-area-inset-bottom))"}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
-          <p style={{margin:0,fontSize:10,color:C.muted,letterSpacing:"0.2em",fontFamily:FC}}>STEP {stepIdx+1}/{routine.steps.length}</p>
+          <p style={{margin:0,fontSize:12,color:C.muted,letterSpacing:"0.2em",fontFamily:FC}}>STEP {stepIdx+1}/{routine.steps.length}</p>
           <button onClick={onClose} style={{background:"none",border:"none",color:C.muted,fontSize:18,cursor:"pointer"}}>×</button>
         </div>
         <p style={{margin:"8px 0 2px",fontSize:20,fontFamily:FD,color:C.greenBright}}>{routine.title}</p>
@@ -2009,6 +2048,12 @@ function AppInner({pin, user, onLogout}){
   const [resetArm,setResetArm]=useState(false);
   const resetTimerRef=useRef(null);
   const [baseForm,setBaseForm]=useState(null);
+  const [importArm,setImportArm]=useState(false);
+  const [pendingImport,setPendingImport]=useState(null);
+  const [importMsg,setImportMsg]=useState("");
+  const importTimerRef=useRef(null);
+  const jsonFileRef=useRef(null);
+  const csvFileRef=useRef(null);
 
   const persist=useCallback(nd=>{setData(nd);save(nd,pin);},[pin]);
 
@@ -2020,10 +2065,19 @@ function AppInner({pin, user, onLogout}){
 
   // Seed sensible default goals for a user who has never picked any.
   // A user who deliberately cleared their goals (goals === []) keeps [].
+  // Also migrate legacy profiles to a per-user programStart, backdated
+  // so the auto week stays exactly where the old global calendar put
+  // it. A manual weekOverride still wins and is left untouched. Both
+  // writes are merged into one persist so neither clobbers the other.
   useEffect(()=>{
+    let nd=null;
     if(data.goals===undefined){
-      persist({...data,goals:["build_muscle","get_stronger","move_better","front_split","vo2max"]});
+      nd={...(nd||data),goals:["build_muscle","get_stronger","move_better","front_split","vo2max"]};
     }
+    if(!data.programStart&&!data.weekOverride){
+      nd={...(nd||data),programStart:isoDaysAgo((calcCurrentWeek()-1)*7)};
+    }
+    if(nd)persist(nd);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   },[]);
 
@@ -2101,9 +2155,10 @@ function AppInner({pin, user, onLogout}){
     setSkillLogDraft({...skillLogDraft,[sid]:{hold:"",note:""}});
   };
 
-  // Auto week from start date
+  // Auto week: manual override wins, then this profile's own program
+  // start date, then the legacy global calendar.
   const autoWeek=calcCurrentWeek();
-  const currentWeek=data.weekOverride||autoWeek;
+  const currentWeek=data.weekOverride||weekFromStart(data.programStart)||autoWeek;
   const ph=phaseFromWeek(currentWeek);
   const deload=isDeload(currentWeek);
   const pc=PHASES[ph].color;
@@ -2136,7 +2191,8 @@ function AppInner({pin, user, onLogout}){
     });
     nd.sessionNotes={};
     nd.conditioningLog=[];
-    nd.weekOverride=1;
+    delete nd.weekOverride;
+    nd.programStart=isoToday();
     persist(nd);
     setTab("train");
   };
@@ -2161,6 +2217,32 @@ function AppInner({pin, user, onLogout}){
     if(!last)return null;
     return calcTarget(last,WO[ph][di].ex[ei],currentWeek,ph);
   };
+
+  // Plateau flags: exercises in the current phase whose last two logged
+  // weeks BOTH missed the hit rule (every work set at target reps with
+  // RIR <= 1). Surfaced in the deload Week Progress Check card.
+  const stalledExercises=(()=>{
+    const names=[];
+    WO[ph].forEach((day,d2)=>{
+      day.ex.forEach((ex,e2)=>{
+        const loggedWeeks=[];
+        for(let w=1;w<=currentWeek;w++){ if(data[WK(ph,d2,e2,w)]) loggedWeeks.push(w); }
+        if(loggedWeeks.length<2)return;
+        const tgt=typeof ex.r==="number"?ex.r:parseInt(ex.r)||10;
+        const missedWeek=(w)=>{
+          const sets=(data[WK(ph,d2,e2,w)]||[]).filter(s=>!s.isWarmup&&!s.isBurnout);
+          if(!sets.length)return false;
+          return !sets.every(s=>{
+            const reps=parseInt(s.r)||0;
+            const rir=parseInt(s.rir);
+            return reps>=tgt&&(isNaN(rir)||rir<=1);
+          });
+        };
+        if(loggedWeeks.slice(-2).every(missedWeek)) names.push(ex.n);
+      });
+    });
+    return names;
+  })();
 
   const saveLog=(ei,sets,note)=>{
     const nd={...data,
@@ -2251,6 +2333,155 @@ function AppInner({pin, user, onLogout}){
     URL.revokeObjectURL(url);
   };
 
+  // Import: restore a full profile from this app's own export file (the
+  // export wraps the profile in a top-level "data" key — unwrap it).
+  // Selecting a file only stages it; nothing is applied until the
+  // two-tap confirm replaces the profile via persist.
+  const IMPORT_KNOWN_KEYS=["wlog","scans","skills","weekOverride","programStart","conditioningLog","stats","measurements","goals","assessment"];
+  const handleJsonFile=(e)=>{
+    const file=e.target.files&&e.target.files[0];
+    e.target.value="";
+    if(!file)return;
+    const reader=new FileReader();
+    reader.onload=()=>{
+      try{
+        const parsed=JSON.parse(reader.result);
+        const candidate=(parsed&&typeof parsed==="object"&&!Array.isArray(parsed)&&parsed.data&&typeof parsed.data==="object"&&!Array.isArray(parsed.data))?parsed.data:parsed;
+        if(!candidate||typeof candidate!=="object"||Array.isArray(candidate))throw new Error("bad shape");
+        if(!IMPORT_KNOWN_KEYS.some(k=>k in candidate))throw new Error("no known keys");
+        setPendingImport(candidate);
+        setImportArm(false);
+        setImportMsg(`Loaded ${file.name} — tap the button below to replace ALL of ${user.name}'s data with it.`);
+      }catch(err){
+        setPendingImport(null);
+        setImportArm(false);
+        setImportMsg("That file doesn't look like a Big & Scary export — nothing was imported.");
+      }
+    };
+    reader.readAsText(file);
+  };
+  const confirmImport=()=>{
+    if(!pendingImport)return;
+    if(!importArm){
+      setImportArm(true);
+      if(importTimerRef.current)clearTimeout(importTimerRef.current);
+      importTimerRef.current=setTimeout(()=>setImportArm(false),3000);
+      return;
+    }
+    if(importTimerRef.current)clearTimeout(importTimerRef.current);
+    const nd=pendingImport;
+    setPendingImport(null);
+    setImportArm(false);
+    setImportMsg("Import complete — this profile's data was replaced with the file's contents.");
+    persist(nd);
+  };
+  // Weight/sleep CSV import: tolerant header (date, weight, sleep in any
+  // order; header optional if the first row parses as a date). Merges
+  // into wlog keyed by the app's own date string ("Nov 14, 2026") —
+  // same-date entries are replaced, new ones appended, order kept
+  // chronological by timestamp.
+  const handleCsvFile=(e)=>{
+    const file=e.target.files&&e.target.files[0];
+    e.target.value="";
+    if(!file)return;
+    const reader=new FileReader();
+    reader.onload=()=>{
+      const lines=String(reader.result||"").split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
+      const parseCsvDate=(s)=>{
+        if(!s)return null;
+        const t=s.trim();
+        const iso=/^(\d{4})-(\d{1,2})-(\d{1,2})/.exec(t);
+        if(iso)return new Date(+iso[1],+iso[2]-1,+iso[3]);
+        const us=/^(\d{1,2})\/(\d{1,2})\/(\d{4})/.exec(t);
+        if(us)return new Date(+us[3],+us[1]-1,+us[2]);
+        const d=new Date(t);
+        return isNaN(d)?null:d;
+      };
+      let di=0,wi=1,si=-1,start=0;
+      if(lines.length){
+        const head=lines[0].toLowerCase().split(",").map(h=>h.trim());
+        const dIdx=head.findIndex(h=>/date|day/.test(h));
+        const wIdx=head.findIndex(h=>/weight|wt|lb/.test(h));
+        const sIdx=head.findIndex(h=>/sleep/.test(h));
+        if(dIdx>=0||wIdx>=0){
+          if(dIdx>=0)di=dIdx;
+          if(wIdx>=0)wi=wIdx;
+          si=sIdx;
+          start=1;
+        }
+      }
+      const byDate={};
+      (data.wlog||[]).forEach(en=>{byDate[en.date]=en;});
+      let count=0;
+      for(let i=start;i<lines.length;i++){
+        const cols=lines[i].split(",").map(c=>c.trim());
+        const d=parseCsvDate(cols[di]);
+        const w=parseFloat(cols[wi]);
+        if(!d||isNaN(w))continue;
+        const dateStr=d.toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"});
+        const prev=byDate[dateStr];
+        const sleepVal=(si>=0&&cols[si])?cols[si]:(prev?prev.sleep||"":"");
+        byDate[dateStr]={date:dateStr,w:String(w),sleep:sleepVal,n:prev?prev.n||"":"",ts:d.getTime()};
+        count++;
+      }
+      if(count===0){setImportMsg("No usable rows found in that CSV — nothing was imported.");return;}
+      const merged=Object.values(byDate).sort((a,b)=>(a.ts||0)-(b.ts||0));
+      persist({...data,wlog:merged});
+      setImportMsg(`Imported ${count} entries into your weight + sleep log.`);
+    };
+    reader.readAsText(file);
+  };
+
+  // ── Progress charts (Track) ────────────────────────────────────────
+  // Strength trends: best estimated 1RM (Epley) per exercise name per
+  // week, scanned from the raw weekly log keys.
+  const strengthTrends=(()=>{
+    const byName={};
+    Object.keys(data).forEach(k=>{
+      const m=/^p(\d+)_d(\d+)_e(\d+)_w(\d+)$/.exec(k);
+      if(!m)return;
+      const p2=+m[1],d2=+m[2],e2=+m[3],w2=+m[4];
+      const exDef=WO[p2]&&WO[p2][d2]&&WO[p2][d2].ex[e2];
+      if(!exDef)return;
+      let best=0;
+      (data[k]||[]).filter(s=>!s.isWarmup&&!s.isBurnout).forEach(s=>{
+        const w=parseFloat(s.w),r=parseInt(s.r);
+        if(w>0&&r>0)best=Math.max(best,w*(1+r/30));
+      });
+      if(best<=0)return;
+      if(!byName[exDef.n])byName[exDef.n]={};
+      byName[exDef.n][w2]=Math.max(byName[exDef.n][w2]||0,best);
+    });
+    return Object.entries(byName)
+      .map(([name,weeks])=>{
+        const ws=Object.keys(weeks).map(Number).sort((a,b)=>a-b);
+        if(ws.length<2)return null;
+        const series=ws.map(w=>({w,v:Math.round(weeks[w])}));
+        const first=series[0].v,latest=series[series.length-1].v;
+        return {name,series,first,latest,delta:first?((latest-first)/first)*100:0,lastWeek:ws[ws.length-1]};
+      })
+      .filter(Boolean)
+      .sort((a,b)=>b.lastWeek-a.lastWeek)
+      .slice(0,6);
+  })();
+  // Adherence per week: done flags vs total exercises in that week's
+  // phase. Null when nothing has ever been completed.
+  const adherenceRows=(()=>{
+    const anyDone=Object.keys(data).some(k=>/^done_p\d+_d\d+_e\d+_w\d+$/.test(k)&&data[k]);
+    if(!anyDone)return null;
+    const rows=[];
+    for(let w=1;w<=currentWeek;w++){
+      const p2=phaseFromWeek(w);
+      const total=WO[p2].reduce((sum,day)=>sum+day.ex.length,0);
+      let done=0;
+      WO[p2].forEach((day,d2)=>{day.ex.forEach((ex,e2)=>{if(data[`done_p${p2}_d${d2}_e${e2}_w${w}`])done++;});});
+      rows.push({w,pct:total?Math.round(done/total*100):0});
+    }
+    return rows;
+  })();
+  const adherence=adherenceRows?adherenceRows.slice(-6):null;
+  const thisWeekAdherence=adherenceRows?((adherenceRows.find(r=>r.w===currentWeek)||{}).pct??null):null;
+
   const scans=data.scans||[];
   const lastScan=scans[scans.length-1];
   const bfStart=myStats?myStats.bf:11.6;
@@ -2278,7 +2509,6 @@ function AppInner({pin, user, onLogout}){
     {id:"meals",  ic:"meals",   lb:"Fuel"},
     {id:"daily",  ic:"daily",   lb:"Daily"},
     {id:"track",  ic:"track",   lb:"Track"},
-    {id:"mobility",ic:"mobility",lb:"Mobility"},
     {id:"skills", ic:"trophy",  lb:"Skills"},
   ];
 
@@ -2289,15 +2519,31 @@ function AppInner({pin, user, onLogout}){
   // and Daily can never disagree. Training-only items appear on training
   // days only, exactly as scheduled.
   const suppsForMeal=(times)=>DAILY_SUPPS.filter(s=>times.includes(s.time)&&(!s.trainOnly||mealDt==="training")).map(s=>s.name);
+  // Per-user nutrition: the MEALS plans are a shared template, so scale
+  // the displayed portions to this user's own calorie target. Andrew's
+  // targets equal the template (factor exactly 1), so his numbers are
+  // untouched; anyone else's plan scales to their baselines. Item
+  // description text stays as written — amounts in text are guides.
+  const fuelTargetCal=myStats?(mealDt==="training"?(myStats.trainCal||mpBase.cal):(myStats.restCal||mpBase.cal)):mpBase.cal;
+  const fuelFactor=(myStats&&fuelTargetCal>0&&mpBase.cal>0)?fuelTargetCal/mpBase.cal:1;
+  const fuelScaled=Math.abs(fuelFactor-1)>=0.02;
+  const scaleSection=(sec)=>fuelScaled?{...sec,items:sec.items.map(it=>({...it,
+    cal:Math.round(it.cal*fuelFactor/5)*5,
+    p:Math.round(it.p*fuelFactor),
+    c:Math.round(it.c*fuelFactor),
+    f:Math.round(it.f*fuelFactor)}))}:sec;
   const mp={...mpBase,
-    cal:myStats?(mealDt==="training"?(myStats.trainCal||mpBase.cal):(myStats.restCal||mpBase.cal)):mpBase.cal,
-    bkfst:{...mpBase.bkfst,supps:suppsForMeal(["5:00 AM","7:15 AM","Breakfast"])},
-    lunch:{...mpBase.lunch,supps:suppsForMeal(["Lunch","Daily"])},
-    dinner:{...mpBase.dinner,supps:suppsForMeal(["Dinner","9:30 PM"])}};
+    cal:fuelTargetCal,
+    p:fuelScaled?Math.round(mpBase.p*fuelFactor):mpBase.p,
+    c:fuelScaled?Math.round(mpBase.c*fuelFactor):mpBase.c,
+    f:fuelScaled?Math.round(mpBase.f*fuelFactor):mpBase.f,
+    bkfst:{...scaleSection(mpBase.bkfst),supps:suppsForMeal(["5:20 AM","6:40 AM","Breakfast"])},
+    lunch:{...scaleSection(mpBase.lunch),supps:suppsForMeal(["Lunch","Daily"])},
+    dinner:{...scaleSection(mpBase.dinner),supps:suppsForMeal(["Dinner","9:30 PM"])}};
 
   // SUPPS DATA (inline for brevity)
   const SUPPS_XS=[
-    {name:"XS Pre-Workout Boost",timing:"5:00 AM training days",caff:115,color:C.red,
+    {name:"XS Pre-Workout Boost",timing:"5:20 AM training days",caff:115,color:C.red,
      ingredients:["4g CarnoSyn Beta-Alanine (buffers lactic acid)","3.4g L-Citrulline (nitric oxide + blood flow)","115mg natural caffeine from green tea","100mg Rhodiola Rosea","L-Theanine (smooth energy, no jitters)","1g EAA blend","Mega-dose B6, B12"],
      dose:"1 serving 20-30 min before training",why:"Clinical doses. The tingling from beta-alanine is normal."},
     {name:"XS Grass Fed Whey",timing:"Post-workout + nightly",caff:0,color:C.red,
@@ -2347,15 +2593,15 @@ function AppInner({pin, user, onLogout}){
   ];
   const CAFF_PHASES=[
     {ph:0,label:"Phase 1",weeks:"Wks 1-4",color:C.blue,total:"115mg",
-     items:[{name:"XS Pre-Workout",mg:115,status:"on",time:"5:00 AM"},{name:"Coffee",mg:100,status:"cut",time:"Cut completely"},{name:"XS Energy Drink",mg:114,status:"cut",time:"Cut completely"}],
+     items:[{name:"XS Pre-Workout",mg:115,status:"on",time:"5:20 AM"},{name:"Coffee",mg:100,status:"cut",time:"Cut completely"},{name:"XS Energy Drink",mg:114,status:"cut",time:"Cut completely"}],
      goal:"Clean baseline. Cortisol reset. Assess sleep.",
      note:"Cortisol peaks at 5am. Coffee on top of pre-workout was amplifying an already stressed system. 115mg only in Phase 1."},
     {ph:1,label:"Phase 2",weeks:"Wks 5-8",color:C.yellow,total:"115-229mg",
-     items:[{name:"XS Pre-Workout",mg:115,status:"on",time:"5:00 AM"},{name:"Coffee",mg:100,status:"cut",time:"Still off"},{name:"XS Energy Drink",mg:114,status:"conditional",time:"Training days before noon only"}],
+     items:[{name:"XS Pre-Workout",mg:115,status:"on",time:"5:20 AM"},{name:"Coffee",mg:100,status:"cut",time:"Still off"},{name:"XS Energy Drink",mg:114,status:"conditional",time:"Training days before noon only"}],
      goal:"Add energy drink strategically as lifts get heavier.",
      note:"Only add XS Energy if you genuinely need it on heavy days. Not a daily habit. Before noon only."},
     {ph:2,label:"Phase 3",weeks:"Wks 9-12",color:C.red,total:"115mg train / 229mg rest",
-     items:[{name:"XS Pre-Workout",mg:115,status:"on",time:"5:00 AM"},{name:"Coffee",mg:100,status:"cut",time:"Still off"},{name:"XS Energy Drink",mg:114,status:"conditional",time:"REST DAYS ONLY before 11am"}],
+     items:[{name:"XS Pre-Workout",mg:115,status:"on",time:"5:20 AM"},{name:"Coffee",mg:100,status:"cut",time:"Still off"},{name:"XS Energy Drink",mg:114,status:"conditional",time:"REST DAYS ONLY before 11am"}],
      goal:"Energy drink as fat-burning tool on rest days only.",
      note:"Phase 3 = precision. Rest day XS Energy boosts fat oxidation without spiking training cortisol."},
   ];
@@ -2366,14 +2612,14 @@ function AppInner({pin, user, onLogout}){
       {/* HEADER */}
       <div style={{paddingTop:"calc(16px + env(safe-area-inset-top))",paddingLeft:18,paddingRight:18,paddingBottom:16,background:C.surface}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
-          <p style={{margin:0,fontSize:10,color:C.muted,letterSpacing:"0.28em",fontFamily:FB,fontWeight:600}}>HUSTLE &amp; HEART</p>
+          <p style={{margin:0,fontSize:12,color:C.muted,letterSpacing:"0.28em",fontFamily:FB,fontWeight:600}}>HUSTLE &amp; HEART</p>
           <div style={{display:"flex",gap:6}}>
             <button onClick={()=>setGoalsOpen(true)}
-              style={{background:"transparent",border:`1px solid ${goals.length?C.yellow:C.border}`,borderRadius:20,padding:"5px 11px",cursor:"pointer",fontSize:10,color:goals.length?C.yellow:C.steel,fontFamily:FB,fontWeight:500}}>
+              style={{background:"transparent",border:`1px solid ${goals.length?C.yellow:C.border}`,borderRadius:20,padding:"5px 11px",cursor:"pointer",fontSize:12,color:goals.length?C.yellow:C.steel,fontFamily:FB,fontWeight:500}}>
               Goals{goals.length?` · ${goals.length}`:""}
             </button>
             <button onClick={onLogout}
-              style={{background:"transparent",border:`1px solid ${C.border}`,borderRadius:20,padding:"5px 11px",cursor:"pointer",fontSize:10,color:C.steel,fontFamily:FB,fontWeight:500}}>
+              style={{background:"transparent",border:`1px solid ${C.border}`,borderRadius:20,padding:"5px 11px",cursor:"pointer",fontSize:12,color:C.steel,fontFamily:FB,fontWeight:500}}>
               Switch
             </button>
           </div>
@@ -2387,10 +2633,10 @@ function AppInner({pin, user, onLogout}){
             <span style={{fontSize:12,color:pc,fontFamily:FB,fontWeight:600}}>{PHASES[ph].label} · Week {currentWeek}</span>
             <span style={{width:3,height:3,borderRadius:"50%",background:C.dim}}/>
             <span style={{fontSize:12,color:C.steel,fontFamily:FB}}>{isTrainingToday?"Training Day":"Rest Day"}</span>
-            {deload&&<span style={{fontSize:9,padding:"2px 8px",borderRadius:10,background:"rgba(212,168,87,0.14)",color:C.yellow,fontFamily:FB,fontWeight:600,letterSpacing:"0.04em"}}>DELOAD</span>}
+            {deload&&<span style={{fontSize:11,padding:"2px 8px",borderRadius:10,background:"rgba(212,168,87,0.14)",color:C.yellow,fontFamily:FB,fontWeight:600,letterSpacing:"0.04em"}}>DELOAD</span>}
           </div>
           {goals.length>0&&(
-            <p style={{margin:"6px 0 0",fontSize:11,color:C.steel,fontFamily:FB}}>
+            <p style={{margin:"6px 0 0",fontSize:12,color:C.steel,fontFamily:FB}}>
               Focus: {goals.map(gid=>GOALS.find(g=>g.id===gid)?.label).filter(Boolean).join(" · ")}
             </p>
           )}
@@ -2400,14 +2646,14 @@ function AppInner({pin, user, onLogout}){
         <div style={{background:"rgba(255,255,255,0.04)",backdropFilter:"blur(10px)",WebkitBackdropFilter:"blur(10px)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:18,padding:"14px 16px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
           {needsSetup?(
             <div>
-              <p style={{margin:"0 0 3px",fontSize:10,letterSpacing:"0.06em",color:C.muted,fontFamily:FB,fontWeight:600}}>BODY FAT</p>
+              <p style={{margin:"0 0 3px",fontSize:12,letterSpacing:"0.06em",color:C.muted,fontFamily:FB,fontWeight:600}}>BODY FAT</p>
               <p style={{margin:0,fontSize:13,fontWeight:600,color:C.yellow,fontFamily:FB,lineHeight:1.35}}>
                 Set {user.name}'s baselines in Track to personalize this program.
               </p>
             </div>
           ):(
             <div>
-              <p style={{margin:"0 0 3px",fontSize:10,letterSpacing:"0.06em",color:C.muted,fontFamily:FB,fontWeight:600}}>BODY FAT</p>
+              <p style={{margin:"0 0 3px",fontSize:12,letterSpacing:"0.06em",color:C.muted,fontFamily:FB,fontWeight:600}}>BODY FAT</p>
               <p style={{margin:0,fontSize:21,fontWeight:700,color:C.text,fontFamily:FD,lineHeight:1}}>
                 {curBF.toFixed(1)}<span style={{fontSize:12,color:C.muted,fontWeight:500}}> → {bfGoal.toFixed(1)}%</span>
               </p>
@@ -2427,11 +2673,18 @@ function AppInner({pin, user, onLogout}){
         {/* ══ WORKOUT TAB ══════════════════════════════════════════════════ */}
         {tab==="workout"&&(
           <div>
+            {/* Today at a glance */}
+            <div style={{background:C.surface,borderRadius:10,padding:"8px 12px",marginBottom:10,border:`1px solid ${C.border}`}}>
+              <p style={{margin:0,fontSize:12,color:C.steel,fontFamily:FB,lineHeight:1.5}}>
+                <span style={{color:pc,fontFamily:FC,fontWeight:700}}>Week {currentWeek}</span> · {wo.day} — {wo.label} · ~{estMinsFor(wo.ex.filter(e=>e.core))} min core · {thisWeekAdherence===null?"This week: not started":`This week: ${thisWeekAdherence}% done`}
+              </p>
+            </div>
+
             {/* Week + Phase status */}
             <div style={{background:C.card,borderRadius:10,padding:"10px 14px",marginBottom:10,border:`1px solid ${C.border}`}}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:deload?8:0}}>
                 <div>
-                  <p style={{margin:0,fontSize:9,color:C.muted,fontFamily:FC,letterSpacing:"0.15em",textTransform:"uppercase"}}>
+                  <p style={{margin:0,fontSize:11,color:C.muted,fontFamily:FC,letterSpacing:"0.15em",textTransform:"uppercase"}}>
                     {currentWeek===1?"SET BASELINE":deload?"DELOAD WEEK":"PROGRESSIVE OVERLOAD"}
                   </p>
                   <p style={{margin:0,fontSize:20,fontFamily:FD,color:pc}}>
@@ -2446,15 +2699,15 @@ function AppInner({pin, user, onLogout}){
                     style={{width:32,height:32,borderRadius:8,background:C.surface,border:`1px solid ${C.border}`,color:C.text,fontSize:18,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>+</button>
                 </div>
               </div>
-              {weekMsg&&<p style={{margin:"0 0 8px",fontSize:11,color:C.yellow,fontFamily:FB}}>{weekMsg}</p>}
+              {weekMsg&&<p style={{margin:"0 0 8px",fontSize:12,color:C.yellow,fontFamily:FB}}>{weekMsg}</p>}
               {deload?(
                 <div style={{background:C.yellow+"22",borderRadius:8,padding:"8px 10px",border:`1px solid ${C.yellow}44`}}>
-                  <p style={{margin:0,fontSize:11,color:C.yellow,fontFamily:FB,lineHeight:1.5}}>
+                  <p style={{margin:0,fontSize:12,color:C.yellow,fontFamily:FB,lineHeight:1.5}}>
                     DELOAD WEEK - Use 60% of normal weight. Same exercises, same sets. Let your body recover. Deloads are where gains are cemented.
                   </p>
                 </div>
               ):(
-                <p style={{margin:0,fontSize:11,color:C.muted,fontFamily:FB,lineHeight:1.4}}>
+                <p style={{margin:0,fontSize:12,color:C.muted,fontFamily:FB,lineHeight:1.4}}>
                   {currentWeek===1?"Log real weights. Week 2+ targets calculate automatically.":"Targets loaded from Week "+(currentWeek-1)+". Green = hit. Yellow = close. Red = missed."}
                 </p>
               )}
@@ -2464,15 +2717,20 @@ function AppInner({pin, user, onLogout}){
             {deload&&(
               <div style={{background:C.purple+"18",border:`1px solid ${C.purple}55`,borderRadius:10,padding:"10px 14px",marginBottom:10}}>
                 <p style={{margin:"0 0 4px",fontSize:12,fontFamily:FC,fontWeight:700,color:C.purple}}>WEEK {currentWeek} PROGRESS CHECK</p>
-                <p style={{margin:0,fontSize:11,color:C.steel,fontFamily:FB,lineHeight:1.5}}>
+                <p style={{margin:0,fontSize:12,color:C.steel,fontFamily:FB,lineHeight:1.5}}>
                   Deload weeks are the natural checkpoint. Measure your front-split floor-to-hip gap and log it under the Front Split skill — it's the only way to know the mobility work is actually working, not just that you're doing it.
                 </p>
-                <button onClick={()=>setTab("skills")} style={{marginTop:8,background:C.purple,color:"#fff",border:"none",borderRadius:7,padding:"7px 12px",fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:FC}}>GO TO SKILLS</button>
-                <p style={{margin:"12px 0 0",fontSize:11,color:C.steel,fontFamily:FB,lineHeight:1.5}}>
+                <button onClick={()=>setTab("skills")} style={{marginTop:8,background:C.purple,color:"#fff",border:"none",borderRadius:7,padding:"7px 12px",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:FC}}>GO TO SKILLS</button>
+                <p style={{margin:"12px 0 0",fontSize:12,color:C.steel,fontFamily:FB,lineHeight:1.5}}>
                   {norwegian4x4History.length>0
                     ?`VO2max check: your last Norwegian 4x4 was RPE ${lastConditioningRPE.rpe}/10 (${lastConditioningRPE.date}). ${norwegian4x4History.length>1?"Same protocol feeling easier at the same RPE is the real signal it's working.":"Keep logging effort each session to start seeing the trend."}`
                     :"VO2max check: no Norwegian 4x4 effort ratings logged yet — rate each session when you finish it and this will track whether the same protocol is getting easier."}
                 </p>
+                {stalledExercises.length>0&&(
+                  <p style={{margin:"12px 0 0",fontSize:12,color:C.yellow,fontFamily:FB,lineHeight:1.5}}>
+                    Stalled — consider a variation, extra rest, or a form check: {stalledExercises.join(", ")} (missed targets two logged weeks in a row).
+                  </p>
+                )}
               </div>
             )}
 
@@ -2491,10 +2749,10 @@ function AppInner({pin, user, onLogout}){
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:10,background:C.card,borderRadius:12,padding:"10px 14px",marginBottom:10,border:`1px solid ${sixtyMinMode?pc:C.border}`}}>
               <div style={{flex:1,minWidth:0}}>
                 <p style={{margin:0,fontSize:12,fontFamily:FC,fontWeight:700,color:sixtyMinMode?pc:C.text}}>60 MIN MODE</p>
-                <p style={{margin:0,fontSize:10,color:C.muted,fontFamily:FB,lineHeight:1.4}}>Core work first — extras collapse under “If you have time”. Full day ~{estMinsFor(wo.ex)} min · core ~{estMinsFor(wo.ex.filter(e=>e.core))} min</p>
+                <p style={{margin:0,fontSize:12,color:C.muted,fontFamily:FB,lineHeight:1.4}}>Core work first — extras collapse under “If you have time”. Full day ~{estMinsFor(wo.ex)} min · core ~{estMinsFor(wo.ex.filter(e=>e.core))} min</p>
               </div>
               <button onClick={()=>persist({...data,sixtyMinMode:!sixtyMinMode})}
-                style={{flexShrink:0,padding:"8px 16px",borderRadius:20,background:sixtyMinMode?pc:"transparent",color:sixtyMinMode?"#000":C.muted,border:`1px solid ${sixtyMinMode?pc:C.border}`,fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:FC}}>
+                style={{flexShrink:0,padding:"8px 16px",borderRadius:20,background:sixtyMinMode?pc:"transparent",color:sixtyMinMode?"#000":C.muted,border:`1px solid ${sixtyMinMode?pc:C.border}`,fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:FC}}>
                 {sixtyMinMode?"ON":"OFF"}
               </button>
             </div>
@@ -2511,26 +2769,50 @@ function AppInner({pin, user, onLogout}){
             {/* From your assessment */}
             {assessment&&recommendedRoutines.length>0&&(
               <div style={{marginBottom:10}}>
-                <p style={{margin:"0 0 8px",fontSize:11,color:C.yellow,letterSpacing:"0.15em",textTransform:"uppercase",fontFamily:FC}}>From Your Assessment</p>
+                <p style={{margin:"0 0 8px",fontSize:12,color:C.yellow,letterSpacing:"0.15em",textTransform:"uppercase",fontFamily:FC}}>From Your Assessment</p>
                 {recommendedRoutines.map(r=>(
                   <div key={r.id} style={{background:C.card,borderRadius:10,padding:"10px 14px",marginBottom:6,border:`1px solid ${C.yellow}44`,display:"flex",justifyContent:"space-between",alignItems:"center",gap:10}}>
                     <div>
                       <p style={{margin:0,fontSize:12,fontFamily:FC,fontWeight:700}}>{r.title}</p>
-                      <p style={{margin:0,fontSize:10,color:C.muted,fontFamily:FB}}>{r.time}</p>
+                      <p style={{margin:0,fontSize:12,color:C.muted,fontFamily:FB}}>{r.time}</p>
                     </div>
-                    <button onClick={()=>setRunningRoutine(r)} style={{flexShrink:0,background:C.yellow,color:"#000",border:"none",borderRadius:7,padding:"7px 12px",fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:FC}}>RUN</button>
+                    <button onClick={()=>setRunningRoutine(r)} style={{flexShrink:0,background:C.yellow,color:"#000",border:"none",borderRadius:7,padding:"7px 12px",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:FC}}>RUN</button>
                   </div>
                 ))}
               </div>
             )}
 
+            {/* Sticky day header — stays pinned while scrolling the exercises */}
+            <div style={{position:"sticky",top:0,zIndex:60,background:C.bg,borderBottom:`1px solid ${C.border}`,padding:"8px 2px 6px",marginBottom:10}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",gap:8,marginBottom:6}}>
+                <p style={{margin:0,fontSize:13,fontFamily:FD,fontWeight:600,color:C.text,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{wo.day} — {wo.label}</p>
+                <p style={{margin:0,fontSize:12,color:C.muted,fontFamily:FC,letterSpacing:"0.08em",whiteSpace:"nowrap"}}>
+                  EST. SESSION: ~{estMinsFor(wo.ex)} MIN{sixtyMinMode?` · CORE ONLY ~${estMinsFor(wo.ex.filter(e=>e.core))} MIN`:""}
+                </p>
+              </div>
+              <div style={{display:"flex",gap:6,overflowX:"auto",paddingBottom:2}}>
+                {(sixtyMinMode
+                  ? [...wo.ex.map((ex,oi)=>({ex,i:oi})).filter(x=>x.ex.core),...wo.ex.map((ex,oi)=>({ex,i:oi})).filter(x=>!x.ex.core)]
+                  : wo.ex.map((ex,oi)=>({ex,i:oi}))).map(({ex,i},chipIdx)=>(
+                  <button key={chipIdx} onClick={()=>{
+                      const el=document.getElementById(`excard-${chipIdx}`);
+                      if(el){el.scrollIntoView({behavior:"smooth",block:"start"});}
+                      else if(sixtyMinMode){setShowOpt(true);setTimeout(()=>{const el2=document.getElementById(`excard-${chipIdx}`);if(el2)el2.scrollIntoView({behavior:"smooth",block:"start"});},90);}
+                    }}
+                    style={{flexShrink:0,padding:"6px 10px",borderRadius:14,background:isDone(i)?pc+"33":C.surface,color:isDone(i)?pc:C.steel,border:`1px solid ${isDone(i)?pc+"66":C.border}`,fontSize:12,fontFamily:FC,fontWeight:600,cursor:"pointer",whiteSpace:"nowrap"}}>
+                    {ex.n}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             {/* Workout card */}
             <div style={{background:C.card,borderRadius:20,overflow:"hidden",boxShadow:"0 8px 24px rgba(0,0,0,0.25)",marginBottom:10}}>
               <div style={{padding:"18px 18px 14px"}}>
-                <p style={{margin:0,fontSize:10,color:C.muted,letterSpacing:"0.1em",textTransform:"uppercase",fontFamily:FB,fontWeight:600}}>{PHASES[ph].sub} · {wo.day}</p>
+                <p style={{margin:0,fontSize:12,color:C.muted,letterSpacing:"0.1em",textTransform:"uppercase",fontFamily:FB,fontWeight:600}}>{PHASES[ph].sub} · {wo.day}</p>
                 <p style={{margin:"5px 0 4px",fontSize:20,fontFamily:FD,fontWeight:600,letterSpacing:"-0.01em",color:C.text}}>{wo.label}</p>
-                <p style={{margin:0,fontSize:11,color:C.steel,fontFamily:FB,lineHeight:1.5}}>{wo.focus}</p>
-                <p style={{margin:"4px 0 0",fontSize:10,color:C.muted,fontFamily:FC,letterSpacing:"0.08em"}}>
+                <p style={{margin:0,fontSize:12,color:C.steel,fontFamily:FB,lineHeight:1.5}}>{wo.focus}</p>
+                <p style={{margin:"4px 0 0",fontSize:12,color:C.muted,fontFamily:FC,letterSpacing:"0.08em"}}>
                   EST. SESSION: ~{estMinsFor(wo.ex)} MIN{sixtyMinMode?` · CORE ONLY ~${estMinsFor(wo.ex.filter(e=>e.core))} MIN`:""}
                 </p>
               </div>
@@ -2538,26 +2820,26 @@ function AppInner({pin, user, onLogout}){
               {wo.warmup&&wo.warmup.length>0&&(
                 <div style={{background:C.green+"11",borderBottom:`1px solid ${C.border}33`}}>
                   <div style={{padding:"10px 14px 0"}}>
-                    <p style={{margin:"0 0 8px",fontSize:10,color:C.greenBright,letterSpacing:"0.15em",textTransform:"uppercase",fontFamily:FC}}>
+                    <p style={{margin:"0 0 8px",fontSize:12,color:C.greenBright,letterSpacing:"0.15em",textTransform:"uppercase",fontFamily:FC}}>
                       Warm-Up Protocol — {wo.warmup.length} exercises · 5-8 min
                     </p>
                   </div>
                   {wo.warmup.map((wu,i)=>(
                     <div key={i} style={{display:"flex",alignItems:"flex-start",gap:10,padding:"7px 14px",borderBottom:i<wo.warmup.length-1?`1px solid ${C.border}22`:"none"}}>
                       <div style={{width:20,height:20,borderRadius:4,flexShrink:0,background:C.green+"33",border:`1px solid ${C.green}44`,display:"flex",alignItems:"center",justifyContent:"center",marginTop:1}}>
-                        <span style={{fontSize:9,fontWeight:"bold",fontFamily:FC,color:C.greenBright}}>{i+1}</span>
+                        <span style={{fontSize:11,fontWeight:"bold",fontFamily:FC,color:C.greenBright}}>{i+1}</span>
                       </div>
                       <div style={{flex:1,minWidth:0}}>
                         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8}}>
                           <p style={{margin:0,fontSize:12,fontFamily:FC,fontWeight:700,color:C.text}}>{wu.n}</p>
-                          <span style={{fontSize:10,color:C.greenBright,fontFamily:FC,flexShrink:0}}>{wu.r}</span>
+                          <span style={{fontSize:12,color:C.greenBright,fontFamily:FC,flexShrink:0}}>{wu.r}</span>
                         </div>
-                        <p style={{margin:"2px 0 0",fontSize:10,color:C.muted,fontFamily:FB,lineHeight:1.4}}>{wu.note}</p>
+                        <p style={{margin:"2px 0 0",fontSize:12,color:C.muted,fontFamily:FB,lineHeight:1.4}}>{wu.note}</p>
                       </div>
                     </div>
                   ))}
                   <div style={{padding:"8px 14px 10px"}}>
-                    <p style={{margin:0,fontSize:10,color:C.muted,fontFamily:FB,fontStyle:"italic"}}>
+                    <p style={{margin:0,fontSize:12,color:C.muted,fontFamily:FB,fontStyle:"italic"}}>
                       Complete all warm-up sets before starting working sets. These are in addition to your morning rehab protocol.
                     </p>
                   </div>
@@ -2574,8 +2856,8 @@ function AppInner({pin, user, onLogout}){
                 if(!sessVol&&!sessNote)return null;
                 return(
                   <div style={{padding:"8px 14px",background:pc+"11",borderBottom:`1px solid ${C.border}33`}}>
-                    {sessVol>0&&<p style={{margin:0,fontSize:11,color:pc,fontFamily:FC}}>Session volume: {Math.round(sessVol).toLocaleString()} lbs</p>}
-                    {sessNote&&<p style={{margin:"2px 0 0",fontSize:11,color:C.muted,fontFamily:FB,fontStyle:"italic"}}>Note: {sessNote}</p>}
+                    {sessVol>0&&<p style={{margin:0,fontSize:12,color:pc,fontFamily:FC}}>Session volume: {Math.round(sessVol).toLocaleString()} lbs</p>}
+                    {sessNote&&<p style={{margin:"2px 0 0",fontSize:12,color:C.muted,fontFamily:FB,fontStyle:"italic"}}>Note: {sessNote}</p>}
                   </div>
                 );
               })()}
@@ -2604,16 +2886,16 @@ function AppInner({pin, user, onLogout}){
                     if(!firstOpt)return null;
                     return(
                       <button key={i} onClick={()=>setShowOpt(true)}
-                        style={{width:"100%",marginBottom:7,padding:"11px 12px",borderRadius:10,background:C.surface,border:`1px dashed ${C.border}`,color:C.steel,fontSize:11,cursor:"pointer",fontFamily:FC,fontWeight:700,textAlign:"left"}}>
+                        style={{width:"100%",marginBottom:7,padding:"11px 12px",borderRadius:10,background:C.surface,border:`1px dashed ${C.border}`,color:C.steel,fontSize:12,cursor:"pointer",fontFamily:FC,fontWeight:700,textAlign:"left"}}>
                         ▸ IF YOU HAVE TIME ({arr.filter(x=>x.ex.opt).length} extra exercises) — TAP TO EXPAND
                       </button>
                     );
                   }
                   return(
-                    <div key={i} style={{marginBottom:7}}>
+                    <div key={i} id={`excard-${dispIdx}`} style={{marginBottom:7,scrollMarginTop:70}}>
                       {sixtyMinMode&&ex.opt&&dispIdx>0&&arr[dispIdx-1].ex.core&&(
                         <button onClick={()=>setShowOpt(false)}
-                          style={{width:"100%",marginBottom:7,padding:"9px 12px",borderRadius:10,background:C.surface,border:`1px dashed ${C.border}`,color:C.steel,fontSize:11,cursor:"pointer",fontFamily:FC,fontWeight:700,textAlign:"left"}}>
+                          style={{width:"100%",marginBottom:7,padding:"9px 12px",borderRadius:10,background:C.surface,border:`1px dashed ${C.border}`,color:C.steel,fontSize:12,cursor:"pointer",fontFamily:FC,fontWeight:700,textAlign:"left"}}>
                           ▾ IF YOU HAVE TIME — TAP TO COLLAPSE
                         </button>
                       )}
@@ -2624,21 +2906,22 @@ function AppInner({pin, user, onLogout}){
                         <div style={{flex:1,minWidth:0}}>
                           <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
                             <p style={{margin:0,fontSize:14,fontFamily:FC,fontWeight:700,color:done?C.muted:C.text,textDecoration:done?"line-through":"none"}}>{ex.n}</p>
-                            {ex.inj&&ex.inj!=="none"&&<span style={{fontSize:9,padding:"2px 5px",borderRadius:4,background:C.yellow+"22",color:C.yellow,fontFamily:FC}}>{ex.inj}</span>}
-                            {deload&&<span style={{fontSize:9,padding:"2px 5px",borderRadius:4,background:C.yellow+"33",color:C.yellow,fontFamily:FC,fontWeight:700}}>DELOAD 60%</span>}
-                            {isPR&&<span style={{fontSize:9,padding:"2px 6px",borderRadius:4,background:C.yellow,color:"#000",fontFamily:FC,fontWeight:700}}>PR!</span>}
+                            {ex.inj&&ex.inj!=="none"&&<span style={{fontSize:11,padding:"2px 5px",borderRadius:4,background:C.yellow+"22",color:C.yellow,fontFamily:FC}}>{ex.inj}</span>}
+                            {deload&&<span style={{fontSize:11,padding:"2px 5px",borderRadius:4,background:C.yellow+"33",color:C.yellow,fontFamily:FC,fontWeight:700}}>DELOAD 60%</span>}
+                            {isPR&&<span style={{fontSize:11,padding:"2px 6px",borderRadius:4,background:C.yellow,color:"#000",fontFamily:FC,fontWeight:700}}>PR!</span>}
                           </div>
-                          <p style={{margin:"1px 0 0",fontSize:11,color:C.muted,fontFamily:FB}}>{ex.s} sets x {ex.r}{typeof ex.r==="number"?" reps":""}</p>
-                          <p style={{margin:"3px 0 0",fontSize:11,color:C.yellow,fontStyle:"italic",fontFamily:FB,lineHeight:1.4}}>{ex.note}</p>
+                          <p style={{margin:"1px 0 0",fontSize:12,color:C.muted,fontFamily:FB}}>{ex.s} sets x {ex.r}{typeof ex.r==="number"?" reps":""}</p>
+                          <p style={{margin:"3px 0 0",fontSize:12,color:C.yellow,fontStyle:"italic",fontFamily:FB,lineHeight:1.4}}>{ex.note}</p>
                           {currentWeek>1&&tgt&&!done&&(
                             <div style={{marginTop:5,background:pc+"11",borderRadius:6,padding:"4px 8px",border:`1px solid ${pc}22`}}>
-                              <p style={{margin:0,fontSize:9,color:pc,fontFamily:FC,letterSpacing:"0.1em"}}>
+                              <p style={{margin:0,fontSize:11,color:pc,fontFamily:FC,letterSpacing:"0.1em"}}>
                                 Wk{currentWeek} target: {tgt.w}lb x {tgt.r}{deload?" (deload 60% applied)":""}
+                                {tgt.autoNote&&<span style={{display:"block",marginTop:2,color:C.muted,letterSpacing:"0.02em",textTransform:"none",fontSize:11}}>{tgt.autoNote}</span>}
                               </p>
                             </div>
                           )}
                           {rm>0&&(
-                            <p style={{margin:"3px 0 0",fontSize:10,color:isPR?C.yellow:C.steel,fontFamily:FC}}>
+                            <p style={{margin:"3px 0 0",fontSize:12,color:isPR?C.yellow:C.steel,fontFamily:FC}}>
                               est 1RM: {rm}lb{isPR?" NEW PR!":""}
                             </p>
                           )}
@@ -2647,7 +2930,7 @@ function AppInner({pin, user, onLogout}){
                               {(data[WK(ph,di,i,currentWeek)]||sets||[]).filter(s=>s.r||s.w).map((s,si)=>{
                                 const isB=s.isBurnout;
                                 return(
-                                  <span key={si} style={{fontSize:9,padding:"2px 7px",borderRadius:5,background:isB?C.red+"22":pc+"22",color:isB?C.red:pc,border:`1px solid ${isB?C.red:pc}33`,fontFamily:FC}}>
+                                  <span key={si} style={{fontSize:11,padding:"2px 7px",borderRadius:5,background:isB?C.red+"22":pc+"22",color:isB?C.red:pc,border:`1px solid ${isB?C.red:pc}33`,fontFamily:FC}}>
                                     {isB?"F:":""}{s.w?`${s.w}lb`:"BW"}x{s.r||"-"}{s.rir!==undefined&&s.rir!==""?" R"+s.rir:""}
                                   </span>
                                 );
@@ -2656,7 +2939,7 @@ function AppInner({pin, user, onLogout}){
                           )}
                         </div>
                         <button onClick={()=>setLm(i)}
-                          style={{flexShrink:0,padding:"5px 10px",borderRadius:8,background:hasLogThisWeek?pc+"33":C.card,border:`1px solid ${hasLogThisWeek?pc+"88":C.border}`,color:hasLogThisWeek?pc:C.muted,fontSize:10,cursor:"pointer",fontFamily:FC,fontWeight:700,whiteSpace:"nowrap"}}>
+                          style={{flexShrink:0,padding:"5px 10px",borderRadius:8,background:hasLogThisWeek?pc+"33":C.card,border:`1px solid ${hasLogThisWeek?pc+"88":C.border}`,color:hasLogThisWeek?pc:C.muted,fontSize:12,cursor:"pointer",fontFamily:FC,fontWeight:700,whiteSpace:"nowrap"}}>
                           {hasLogThisWeek?"EDIT":"LOG"}
                         </button>
                       </div>
@@ -2684,13 +2967,13 @@ function AppInner({pin, user, onLogout}){
               return(
                 <>
                   <div style={{background:C.blue+"18",border:`1px solid ${C.blue}44`,borderRadius:10,padding:"10px 14px",marginBottom:10}}>
-                    <p style={{margin:0,fontSize:11,color:C.blueBright,fontFamily:FB,lineHeight:1.5}}>
+                    <p style={{margin:0,fontSize:12,color:C.blueBright,fontFamily:FB,lineHeight:1.5}}>
                       On rest days, not lifting days — stacking hard cardio onto a heavy lifting session works against your strength and muscle goals. {thisWeekDone.length>0?`${thisWeekDone.length} session${thisWeekDone.length>1?"s":""} logged this week.`:"Aim for 2 sessions this week."}
                     </p>
                   </div>
                   {deload&&isIntervalSession&&(
                     <div style={{background:C.purple+"18",border:`1px solid ${C.purple}55`,borderRadius:10,padding:"10px 14px",marginBottom:10}}>
-                      <p style={{margin:0,fontSize:11,color:C.purple,fontFamily:FB,lineHeight:1.5}}>
+                      <p style={{margin:0,fontSize:12,color:C.purple,fontFamily:FB,lineHeight:1.5}}>
                         Deload week — this interval session is trimmed to 3 rounds instead of 4. The deload only works if conditioning backs off too, not just the lifting.
                       </p>
                     </div>
@@ -2704,24 +2987,24 @@ function AppInner({pin, user, onLogout}){
                   </div>
                   <div style={{background:C.card,borderRadius:20,overflow:"hidden",boxShadow:"0 8px 24px rgba(0,0,0,0.25)",marginBottom:10}}>
                     <div style={{padding:"18px 18px 14px"}}>
-                      <p style={{margin:0,fontSize:10,color:C.muted,letterSpacing:"0.1em",textTransform:"uppercase",fontFamily:FB,fontWeight:600}}>{PHASES[ph].label} · VO2max</p>
+                      <p style={{margin:0,fontSize:12,color:C.muted,letterSpacing:"0.1em",textTransform:"uppercase",fontFamily:FB,fontWeight:600}}>{PHASES[ph].label} · VO2max</p>
                       <p style={{margin:"5px 0 4px",fontSize:20,fontFamily:FD,fontWeight:600,letterSpacing:"-0.01em",color:C.text}}>{session.title}</p>
-                      <p style={{margin:0,fontSize:11,color:C.steel,fontFamily:FB,lineHeight:1.5}}>{session.focus}</p>
+                      <p style={{margin:0,fontSize:12,color:C.steel,fontFamily:FB,lineHeight:1.5}}>{session.focus}</p>
                     </div>
                     <div style={{padding:"4px 14px 14px"}}>
-                      <p style={{margin:"0 0 8px",fontSize:10,color:C.greenBright,letterSpacing:"0.15em",textTransform:"uppercase",fontFamily:FC}}>Warm-Up</p>
+                      <p style={{margin:"0 0 8px",fontSize:12,color:C.greenBright,letterSpacing:"0.15em",textTransform:"uppercase",fontFamily:FC}}>Warm-Up</p>
                       {session.warmup.map((wu,i)=>(
                         <p key={i} style={{margin:"0 0 6px",fontSize:12,color:C.text,fontFamily:FB}}>
                           <span style={{color:C.greenBright,fontFamily:FC}}>{wu.r}</span> — {wu.n} {wu.note&&<span style={{color:C.muted}}>· {wu.note}</span>}
                         </p>
                       ))}
-                      <p style={{margin:"10px 0 6px",fontSize:10,color:C.blueBright,letterSpacing:"0.15em",textTransform:"uppercase",fontFamily:FC}}>Main Set</p>
+                      <p style={{margin:"10px 0 6px",fontSize:12,color:C.blueBright,letterSpacing:"0.15em",textTransform:"uppercase",fontFamily:FC}}>Main Set</p>
                       {session.steps.map((st,i)=>(
                         <p key={i} style={{margin:"0 0 5px",fontSize:12,color:C.text,fontFamily:FB}}>
                           <span style={{color:C.blueBright,fontFamily:FC}}>{Math.round(st.dur/60)}min</span> {st.label} <span style={{color:C.muted}}>— {st.note}</span>
                         </p>
                       ))}
-                      <p style={{margin:"10px 0 0",fontSize:11,color:C.muted,fontFamily:FB,fontStyle:"italic"}}>Cooldown: {session.cooldown}</p>
+                      <p style={{margin:"10px 0 0",fontSize:12,color:C.muted,fontFamily:FB,fontStyle:"italic"}}>Cooldown: {session.cooldown}</p>
                     </div>
                   </div>
                   <button onClick={()=>setRunningConditioning({...session,steps:[
@@ -2747,7 +3030,7 @@ function AppInner({pin, user, onLogout}){
         {tab==="meals"&&(
           <div>
             <div style={{background:C.card,borderRadius:14,padding:"10px 14px",marginBottom:10,border:`1px solid ${pc}33`}}>
-              <p style={{margin:0,fontSize:11,color:pc,fontFamily:FB,fontWeight:600}}>
+              <p style={{margin:0,fontSize:12,color:pc,fontFamily:FB,fontWeight:600}}>
                 Auto-synced to {PHASES[ph].label} — Week {currentWeek}
               </p>
             </div>
@@ -2759,7 +3042,7 @@ function AppInner({pin, user, onLogout}){
               ))}
             </div>
             <div style={{background:C.card,borderRadius:18,padding:"16px 16px",marginBottom:12,boxShadow:"0 8px 24px rgba(0,0,0,0.25)"}}>
-              <p style={{margin:"0 0 12px",fontSize:10,color:C.muted,letterSpacing:"0.1em",textTransform:"uppercase",fontFamily:FB,fontWeight:600}}>
+              <p style={{margin:"0 0 12px",fontSize:12,color:C.muted,letterSpacing:"0.1em",textTransform:"uppercase",fontFamily:FB,fontWeight:600}}>
                 Daily Totals · {PHASES[ph].label} · {mealDt==="training"?"Training":"Rest"} Day
               </p>
               {needsSetup?(
@@ -2771,9 +3054,14 @@ function AppInner({pin, user, onLogout}){
                   {[["~"+mp.cal,"kcal",C.yellow],["~"+mp.p+"g","protein",C.green],["~"+mp.c+"g","carbs",C.blue],["~"+mp.f+"g","fat",C.steel]].map(([v,l,col])=>(
                     <div key={l} style={{flex:1,textAlign:"center",background:"rgba(255,255,255,0.03)",borderRadius:12,padding:"10px 4px",border:`1px solid ${col}33`}}>
                       <p style={{margin:0,fontSize:14,fontWeight:600,fontFamily:FD,color:col}}>{v}</p>
-                      <p style={{margin:0,fontSize:9,color:C.muted,textTransform:"uppercase"}}>{l}</p>
+                      <p style={{margin:0,fontSize:11,color:C.muted,textTransform:"uppercase"}}>{l}</p>
                     </div>
                   ))}
+                </div>
+              )}
+              {fuelScaled&&(
+                <div style={{marginTop:10,display:"inline-block",background:pc+"22",border:`1px solid ${pc}44`,borderRadius:12,padding:"4px 10px"}}>
+                  <span style={{fontSize:12,color:pc,fontFamily:FC,fontWeight:700}}>Portions scaled ×{fuelFactor.toFixed(2)} to your {mp.cal.toLocaleString()} kcal target</span>
                 </div>
               )}
             </div>
@@ -2781,7 +3069,7 @@ function AppInner({pin, user, onLogout}){
             <MealBlock section={mp.lunch} title="Lunch" emoji="e" pc={pc}/>
             <MealBlock section={mp.dinner} title="Dinner" emoji="f" pc={pc}/>
             <div style={{background:C.card,borderRadius:16,padding:"14px 16px",border:`1px solid ${C.yellow}33`,marginBottom:8}}>
-              <p style={{margin:"0 0 6px",fontSize:10,color:C.yellow,letterSpacing:"0.1em",fontFamily:FB,fontWeight:600,textTransform:"uppercase"}}>Coach Note</p>
+              <p style={{margin:"0 0 6px",fontSize:12,color:C.yellow,letterSpacing:"0.1em",fontFamily:FB,fontWeight:600,textTransform:"uppercase"}}>Coach Note</p>
               <p style={{margin:0,fontSize:12,color:C.muted,lineHeight:1.6,fontFamily:FB}}>
                 Current target: {mp.cal.toLocaleString()} kcal · {mp.p}g protein · {mp.c}g carbs. Targets hold steady or rise across phases now rather than cutting further — you're adding muscle, strength, and VO2max work, not just cutting fat. Fix sleep first - 7 hrs unlocks more than any macro change would.
               </p>
@@ -2797,10 +3085,10 @@ function AppInner({pin, user, onLogout}){
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
                 <div>
                   <p style={{margin:0,fontSize:18,fontWeight:600,fontFamily:FD,color:C.green}}>Daily Supps</p>
-                  <p style={{margin:0,fontSize:11,color:C.muted,fontFamily:FB}}>{new Date().toLocaleDateString("en-US",{weekday:"long",month:"short",day:"numeric"})}</p>
+                  <p style={{margin:0,fontSize:12,color:C.muted,fontFamily:FB}}>{new Date().toLocaleDateString("en-US",{weekday:"long",month:"short",day:"numeric"})}</p>
                 </div>
                 <div style={{background:C.green+"22",borderRadius:10,padding:"6px 12px",textAlign:"center"}}>
-                  <p style={{margin:0,fontSize:9,color:C.green,fontFamily:FC}}>DONE</p>
+                  <p style={{margin:0,fontSize:11,color:C.green,fontFamily:FC}}>DONE</p>
                   <p style={{margin:0,fontSize:18,fontFamily:FD,color:C.green}}>{suppDoneCount}/{todaySupps.length}</p>
                 </div>
               </div>
@@ -2809,12 +3097,12 @@ function AppInner({pin, user, onLogout}){
                 <div style={{width:`${todaySupps.length>0?suppDoneCount/todaySupps.length*100:0}%`,height:"100%",background:C.green,borderRadius:4,transition:"width 0.4s"}}/>
               </div>
               {/* Morning group */}
-              {["Breakfast","5:00 AM","7:15 AM","Daily"].map(timeGroup=>{
+              {["Breakfast","5:20 AM","6:40 AM","Daily"].map(timeGroup=>{
                 const group=todaySupps.filter(s=>s.time===timeGroup);
                 if(!group.length)return null;
                 return(
                   <div key={timeGroup} style={{marginBottom:12}}>
-                    <p style={{margin:"0 0 6px",fontSize:9,color:C.muted,fontFamily:FC,letterSpacing:"0.15em",textTransform:"uppercase"}}>{timeGroup}</p>
+                    <p style={{margin:"0 0 6px",fontSize:11,color:C.muted,fontFamily:FC,letterSpacing:"0.15em",textTransform:"uppercase"}}>{timeGroup}</p>
                     {group.map(s=>{
                       const done=checkedSupps[s.id];
                       return(
@@ -2825,9 +3113,9 @@ function AppInner({pin, user, onLogout}){
                           </div>
                           <div style={{flex:1}}>
                             <p style={{margin:0,fontSize:12,fontFamily:FC,fontWeight:700,color:done?C.muted:s.cat==="xs"?C.red:C.green,textDecoration:done?"line-through":"none"}}>{s.name}</p>
-                            <p style={{margin:0,fontSize:10,color:C.muted,fontFamily:FB}}>{s.note}</p>
+                            <p style={{margin:0,fontSize:12,color:C.muted,fontFamily:FB}}>{s.note}</p>
                           </div>
-                          <span style={{fontSize:9,padding:"2px 7px",borderRadius:4,background:s.cat==="xs"?C.red+"22":C.green+"22",color:s.cat==="xs"?C.red:C.green,fontFamily:FC,flexShrink:0}}>{s.cat.toUpperCase()}</span>
+                          <span style={{fontSize:11,padding:"2px 7px",borderRadius:4,background:s.cat==="xs"?C.red+"22":C.green+"22",color:s.cat==="xs"?C.red:C.green,fontFamily:FC,flexShrink:0}}>{s.cat.toUpperCase()}</span>
                         </button>
                       );
                     })}
@@ -2840,7 +3128,7 @@ function AppInner({pin, user, onLogout}){
                 if(!group.length)return null;
                 return(
                   <div key={timeGroup} style={{marginBottom:12}}>
-                    <p style={{margin:"0 0 6px",fontSize:9,color:C.muted,fontFamily:FC,letterSpacing:"0.15em",textTransform:"uppercase"}}>{timeGroup}</p>
+                    <p style={{margin:"0 0 6px",fontSize:11,color:C.muted,fontFamily:FC,letterSpacing:"0.15em",textTransform:"uppercase"}}>{timeGroup}</p>
                     {group.map(s=>{
                       const done=checkedSupps[s.id];
                       return(
@@ -2851,9 +3139,9 @@ function AppInner({pin, user, onLogout}){
                           </div>
                           <div style={{flex:1}}>
                             <p style={{margin:0,fontSize:12,fontFamily:FC,fontWeight:700,color:done?C.muted:s.cat==="xs"?C.red:C.green,textDecoration:done?"line-through":"none"}}>{s.name}</p>
-                            <p style={{margin:0,fontSize:10,color:C.muted,fontFamily:FB}}>{s.note}</p>
+                            <p style={{margin:0,fontSize:12,color:C.muted,fontFamily:FB}}>{s.note}</p>
                           </div>
-                          <span style={{fontSize:9,padding:"2px 7px",borderRadius:4,background:s.cat==="xs"?C.red+"22":C.green+"22",color:s.cat==="xs"?C.red:C.green,fontFamily:FC,flexShrink:0}}>{s.cat.toUpperCase()}</span>
+                          <span style={{fontSize:11,padding:"2px 7px",borderRadius:4,background:s.cat==="xs"?C.red+"22":C.green+"22",color:s.cat==="xs"?C.red:C.green,fontFamily:FC,flexShrink:0}}>{s.cat.toUpperCase()}</span>
                         </button>
                       );
                     })}
@@ -2870,8 +3158,8 @@ function AppInner({pin, user, onLogout}){
                   const col=item.status==="on"?C.green:item.status==="cut"?C.red:C.yellow;
                   return(
                     <div key={i} style={{background:col+"22",borderRadius:8,padding:"6px 10px",border:`1px solid ${col}44`}}>
-                      <p style={{margin:0,fontSize:9,fontFamily:FC,color:col,fontWeight:700,textDecoration:item.status==="cut"?"line-through":"none"}}>{item.name}</p>
-                      <p style={{margin:0,fontSize:9,fontFamily:FB,color:C.muted}}>{item.status==="cut"?"CUT":item.mg+"mg - "+item.time}</p>
+                      <p style={{margin:0,fontSize:11,fontFamily:FC,color:col,fontWeight:700,textDecoration:item.status==="cut"?"line-through":"none"}}>{item.name}</p>
+                      <p style={{margin:0,fontSize:11,fontFamily:FB,color:C.muted}}>{item.status==="cut"?"CUT":item.mg+"mg - "+item.time}</p>
                     </div>
                   );
                 })}
@@ -2884,7 +3172,7 @@ function AppInner({pin, user, onLogout}){
                 <Ic n="camera" sz={18} col={C.steel}/>
                 <p style={{margin:0,fontSize:14,fontWeight:600,fontFamily:FD,color:C.text}}>Weekly Progress Photo</p>
               </div>
-              <p style={{margin:"0 0 8px",fontSize:11,color:C.muted,fontFamily:FB,lineHeight:1.5}}>
+              <p style={{margin:"0 0 8px",fontSize:12,color:C.muted,fontFamily:FB,lineHeight:1.5}}>
                 Every Sunday morning. Same time. Same lighting. Same pose. Front, side, and back. These photos will show results the scale misses.
               </p>
               <div style={{background:C.surface,borderRadius:8,padding:"8px 12px",border:`1px solid ${C.border}`}}>
@@ -2893,7 +3181,7 @@ function AppInner({pin, user, onLogout}){
                   "Natural lighting near a window",
                   "Front relaxed + front flexed + side + back",
                   "Save to a dedicated album for comparison",
-                ].map((t,i)=>(<p key={i} style={{margin:"0 0 4px",fontSize:11,color:C.steel,fontFamily:FB}}><span style={{color:C.green}}>v </span>{t}</p>))}
+                ].map((t,i)=>(<p key={i} style={{margin:"0 0 4px",fontSize:12,color:C.steel,fontFamily:FB}}><span style={{color:C.green}}>v </span>{t}</p>))}
               </div>
             </div>
 
@@ -2901,9 +3189,102 @@ function AppInner({pin, user, onLogout}){
             <div style={{background:C.card,borderRadius:12,padding:"12px 14px",border:`1px solid ${C.border}`}}>
               <p style={{margin:"0 0 8px",fontSize:14,fontWeight:600,fontFamily:FD,color:C.yellow}}>Daily Mobility · 10 Min</p>
               {[["Hip 90/90 Stretch","2 min"],["Couch Stretch","2 min"],["Thoracic Foam Roll","2 min"],["Band Shoulder Dislocates","2 min"],["Calf + Soleus","2 min"]].map(([t,tm],i)=>(
-                <p key={i} style={{margin:"0 0 5px",fontSize:11,color:C.muted,fontFamily:FB}}><span style={{color:C.red}}>! </span><span style={{color:C.text,fontWeight:"bold"}}>{t}</span> - {tm}</p>
+                <p key={i} style={{margin:"0 0 5px",fontSize:12,color:C.muted,fontFamily:FB}}><span style={{color:C.red}}>! </span><span style={{color:C.text,fontWeight:"bold"}}>{t}</span> - {tm}</p>
               ))}
-              <p style={{margin:"8px 0 0",fontSize:10,color:C.muted,fontFamily:FB}}>See Mobility tab for full protocol.</p>
+              <p style={{margin:"8px 0 0",fontSize:12,color:C.muted,fontFamily:FB}}>See the Mobility section below for the full protocol.</p>
+            </div>
+
+            {/* Mobility — the full protocol, merged in from its own tab */}
+            <div id="mobility-section" style={{marginTop:16}}>
+              <p style={{margin:"0 0 10px",fontSize:18,fontWeight:600,fontFamily:FD,color:C.purple}}>Mobility</p>
+            {/* Baseline assessment */}
+            <div style={{background:C.card,borderRadius:12,padding:"14px 16px",marginBottom:14,border:`1px solid ${C.purple}44`}}>
+              {assessment?(
+                <>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+                    <p style={{margin:0,fontSize:16,fontWeight:600,fontFamily:FD,color:C.purple}}>Your Priorities</p>
+                    <button onClick={()=>setAssessmentOpen(true)} style={{background:"none",border:`1px solid ${C.border}`,borderRadius:6,padding:"3px 8px",fontSize:11,color:C.muted,fontFamily:FC,cursor:"pointer"}}>RETAKE</button>
+                  </div>
+                  <p style={{margin:0,fontSize:12,color:C.steel,fontFamily:FB,lineHeight:1.5}}>
+                    Based on your assessment, focus on: {assessment.priorities.map(a=>ASSESSMENT_QUESTIONS.find(q=>q.area===a)?.label).filter(Boolean).join(", ")||"general mobility"}.
+                  </p>
+                </>
+              ):(
+                <>
+                  <p style={{margin:"0 0 6px",fontSize:16,fontWeight:600,fontFamily:FD,color:C.purple}}>Take Your Baseline Assessment</p>
+                  <p style={{margin:"0 0 10px",fontSize:12,color:C.muted,fontFamily:FB,lineHeight:1.5}}>5 quick questions on ankles, hips, shoulders, squat depth, and balance — surfaces what to prioritize below.</p>
+                  <button onClick={()=>setAssessmentOpen(true)} style={{width:"100%",background:C.purple,color:"#fff",border:"none",borderRadius:8,padding:"11px",fontSize:13,fontWeight:"bold",cursor:"pointer",fontFamily:FC,letterSpacing:"0.08em"}}>START ASSESSMENT</button>
+                </>
+              )}
+            </div>
+
+            {/* Recommended */}
+            {recommendedRoutines.length>0&&(
+              <div style={{marginBottom:14}}>
+                <p style={{margin:"0 0 8px",fontSize:12,color:C.yellow,letterSpacing:"0.15em",textTransform:"uppercase",fontFamily:FC}}>Recommended For You</p>
+                {recommendedRoutines.map(r=>(
+                  <div key={r.id} style={{background:C.card,borderRadius:12,padding:"12px 14px",marginBottom:8,border:`1px solid ${C.yellow}55`,display:"flex",justifyContent:"space-between",alignItems:"center",gap:10}}>
+                    <div>
+                      <p style={{margin:0,fontSize:13,fontFamily:FC,fontWeight:700}}>{r.title}</p>
+                      <p style={{margin:0,fontSize:12,color:C.muted,fontFamily:FB}}>{r.time}</p>
+                    </div>
+                    <button onClick={()=>setRunningRoutine(r)} style={{flexShrink:0,background:C.yellow,color:"#000",border:"none",borderRadius:8,padding:"8px 14px",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:FC}}>RUN</button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Chain reaction info (kept from original) */}
+            <div style={{background:C.card,borderRadius:12,padding:"14px 16px",marginBottom:14,border:`1px solid ${C.yellow}33`}}>
+              <p style={{margin:"0 0 6px",fontSize:18,fontWeight:600,fontFamily:FD,color:C.yellow}}>The Chain Reaction</p>
+              <p style={{margin:0,fontSize:12,color:C.muted,lineHeight:1.7,fontFamily:FB}}>
+                <span style={{color:C.yellow}}>Tight feet/ankles</span> - restrict hips - anterior pelvic tilt - stress lumbar - limit thoracic - restrict shoulders - stress AC joint. Fix from the ground up. 10 min daily.
+              </p>
+            </div>
+
+            {/* Routine library grouped by domain */}
+            {mobilityByDomain.map(d=>(
+              <div key={d.id} style={{marginBottom:16}}>
+                <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
+                  <span style={{width:8,height:8,borderRadius:"50%",background:d.color}}/>
+                  <p style={{margin:0,fontSize:13,fontFamily:FC,fontWeight:700,color:d.color,textTransform:"uppercase",letterSpacing:"0.1em"}}>{d.label}</p>
+                  <p style={{margin:0,fontSize:12,color:C.muted,fontFamily:FB}}>{d.desc}</p>
+                </div>
+                {d.routines.map(r=>(
+                  <div key={r.id} style={{background:C.card,borderRadius:12,padding:"12px 14px",marginBottom:8,border:`1px solid ${C.border}`}}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6,flexWrap:"wrap",gap:4}}>
+                      <p style={{margin:0,fontSize:14,fontFamily:FC,fontWeight:700}}>{r.title}</p>
+                      <div style={{display:"flex",gap:6,alignItems:"center"}}>
+                        {r.pri&&<span style={{fontSize:11,padding:"2px 7px",borderRadius:4,background:r.pri==="CRITICAL"?C.red+"33":r.pri==="HIGH"?C.yellow+"22":C.border,color:r.pri==="CRITICAL"?C.red:r.pri==="HIGH"?C.yellow:C.muted,fontFamily:FC}}>{r.pri}</span>}
+                        <span style={{fontSize:11,padding:"2px 7px",borderRadius:4,background:C.surface,color:C.steel,fontFamily:FC}}>{r.time}</span>
+                      </div>
+                    </div>
+                    <p style={{margin:"0 0 8px",fontSize:12,color:C.muted,lineHeight:1.6,fontFamily:FB}}>{r.body}</p>
+                    <button onClick={()=>setRunningRoutine(r)} style={{background:d.color,color:"#000",border:"none",borderRadius:7,padding:"7px 14px",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:FC}}>RUN ROUTINE</button>
+                  </div>
+                ))}
+              </div>
+            ))}
+
+            {/* Recent mobility history */}
+            {mobilityLog.length>0&&(
+              <div style={{background:C.card,borderRadius:12,padding:"14px 16px",border:`1px solid ${C.border}`,marginBottom:8}}>
+                <p style={{margin:"0 0 10px",fontSize:14,fontFamily:FC,fontWeight:700}}>Recent Sessions</p>
+                {mobilityLog.slice().reverse().slice(0,5).map((e,i)=>(
+                  <div key={i} style={{display:"flex",justifyContent:"space-between",padding:"5px 0",borderBottom:i<4?`1px solid ${C.border}33`:"none"}}>
+                    <span style={{fontSize:12,color:C.muted,fontFamily:FB}}>{e.date}</span>
+                    <span style={{fontSize:12,color:C.text,fontFamily:FC}}>{e.title}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div style={{background:C.card,borderRadius:12,padding:"14px 16px",border:`1px solid ${C.border}`,marginBottom:8}}>
+              <p style={{margin:"0 0 10px",fontSize:14,fontFamily:FC,fontWeight:700,color:C.red}}>NEVER DO (AC Joint)</p>
+              {["Behind-the-neck press or pulldown","Wide-grip upright rows","Max weight barbell flat bench - use DBs","Sleeping on your right shoulder"].map((r,i)=>(
+                <p key={i} style={{margin:"0 0 6px",fontSize:12,color:C.muted,fontFamily:FB}}><span style={{color:C.red}}>X </span>{r}</p>
+              ))}
+            </div>
             </div>
           </div>
         )}
@@ -2914,18 +3295,36 @@ function AppInner({pin, user, onLogout}){
             {/* Export for migration to the new platform */}
             <div style={{background:C.card,borderRadius:12,padding:"14px 16px",marginBottom:12,border:`1px solid ${C.yellow}55`}}>
               <p style={{margin:"0 0 4px",fontSize:16,fontFamily:FD,color:C.yellow}}>Export My Data</p>
-              <p style={{margin:"0 0 10px",fontSize:11,color:C.muted,fontFamily:FB,lineHeight:1.5}}>
+              <p style={{margin:"0 0 10px",fontSize:12,color:C.muted,fontFamily:FB,lineHeight:1.5}}>
                 Download everything you've logged here — lifts, scans, weight, measurements, supplements — as a file
                 you can import into the new app so your history carries over.
               </p>
               <button onClick={exportData} style={{width:"100%",background:C.yellow,color:"#000",border:"none",borderRadius:8,padding:"12px",fontSize:14,fontWeight:"bold",cursor:"pointer",fontFamily:FC,textTransform:"uppercase",letterSpacing:"0.1em"}}>DOWNLOAD EXPORT FILE</button>
             </div>
 
+            {/* Import data */}
+            <div style={{background:C.card,borderRadius:12,padding:"14px 16px",marginBottom:12,border:`1px solid ${C.blue}55`}}>
+              <p style={{margin:"0 0 4px",fontSize:16,fontFamily:FD,color:C.blue}}>Import Data</p>
+              <p style={{margin:"0 0 10px",fontSize:12,color:C.muted,fontFamily:FB,lineHeight:1.5}}>
+                Restore {user.name}'s profile from a Big & Scary export file (JSON) — it replaces ALL current data for this profile, so you confirm twice and nothing is applied just by picking a file. Or merge a weight + sleep CSV (columns: date, weight, sleep) into the log — same-date entries are replaced, new ones added. Apple Health users: a web page can't read Apple Health directly, but you can export weight and sleep to CSV with an Apple Shortcuts automation and import the file here.
+              </p>
+              <input ref={jsonFileRef} type="file" accept=".json" onChange={handleJsonFile} style={{display:"none"}}/>
+              <input ref={csvFileRef} type="file" accept=".csv" onChange={handleCsvFile} style={{display:"none"}}/>
+              <div style={{display:"flex",gap:8}}>
+                <button onClick={()=>jsonFileRef.current&&jsonFileRef.current.click()} style={{flex:1,background:C.blue,color:"#fff",border:"none",borderRadius:8,padding:"12px",fontSize:12,fontWeight:"bold",cursor:"pointer",fontFamily:FC,textTransform:"uppercase",letterSpacing:"0.08em"}}>IMPORT JSON EXPORT</button>
+                <button onClick={()=>csvFileRef.current&&csvFileRef.current.click()} style={{flex:1,background:C.surface,color:C.blue,border:`1px solid ${C.blue}`,borderRadius:8,padding:"12px",fontSize:12,fontWeight:"bold",cursor:"pointer",fontFamily:FC,textTransform:"uppercase",letterSpacing:"0.08em"}}>IMPORT WEIGHT CSV</button>
+              </div>
+              {pendingImport&&(
+                <button onClick={confirmImport} style={{width:"100%",marginTop:8,background:importArm?C.red:C.surface,color:importArm?"#fff":C.red,border:`1px solid ${C.red}`,borderRadius:8,padding:"12px",fontSize:12,fontWeight:"bold",cursor:"pointer",fontFamily:FC,textTransform:"uppercase",letterSpacing:"0.08em"}}>{importArm?"TAP AGAIN TO REPLACE ALL MY DATA":"REPLACE ALL MY DATA WITH THIS FILE"}</button>
+              )}
+              {importMsg&&<p style={{margin:"10px 0 0",fontSize:12,color:C.yellow,fontFamily:FB,lineHeight:1.5}}>{importMsg}</p>}
+            </div>
+
             {/* Restart program at Week 1 */}
             <div style={{background:C.card,borderRadius:12,padding:"14px 16px",marginBottom:12,border:`1px solid ${C.red}55`}}>
               <p style={{margin:"0 0 4px",fontSize:16,fontFamily:FD,color:C.red}}>Restart Program</p>
-              <p style={{margin:"0 0 10px",fontSize:11,color:C.muted,fontFamily:FB,lineHeight:1.5}}>
-                Start over at Week 1: clears every week's logged exercises, completion checkmarks, session notes and conditioning log for {user.name}. Your baselines, weight log, Hume scans, measurements and skill levels are kept. After restarting, use the week stepper in Train to move forward as you finish each week.
+              <p style={{margin:"0 0 10px",fontSize:12,color:C.muted,fontFamily:FB,lineHeight:1.5}}>
+                Start over at Week 1: clears every week's logged exercises, completion checkmarks, session notes and conditioning log for {user.name}. Your baselines, weight log, Hume scans, measurements and skill levels are kept. Weeks now advance automatically from your restart date — the week stepper in Train can still override when you need it to.
               </p>
               <button onClick={resetProgram} style={{width:"100%",background:resetArm?C.red:C.surface,color:resetArm?"#fff":C.red,border:`1px solid ${C.red}`,borderRadius:8,padding:"12px",fontSize:14,fontWeight:"bold",cursor:"pointer",fontFamily:FC,textTransform:"uppercase",letterSpacing:"0.1em"}}>{resetArm?"TAP AGAIN TO CONFIRM RESTART":"RESTART AT WEEK 1"}</button>
             </div>
@@ -2933,13 +3332,13 @@ function AppInner({pin, user, onLogout}){
             {/* Per-user baselines */}
             <div style={{background:C.card,borderRadius:12,padding:"14px 16px",marginBottom:12,border:`1px solid ${needsSetup?C.yellow:C.border}`}}>
               <p style={{margin:"0 0 4px",fontSize:18,fontFamily:FD}}>My Baselines</p>
-              <p style={{margin:"0 0 12px",fontSize:11,color:C.muted,fontFamily:FB,lineHeight:1.5}}>
+              <p style={{margin:"0 0 12px",fontSize:12,color:C.muted,fontFamily:FB,lineHeight:1.5}}>
                 {user.name}'s personal stats. These drive the header body-fat card, PR targets, the BF% journey and Fuel calorie totals. Saved under {user.name}'s own profile only.
               </p>
               <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:8}}>
                 {[["Weight (lbs)","weight"],["Body fat %","bf"],["BF goal %","bfGoal"],["Muscle (lbs)","muscle"],["Bench now (lbs)","benchC"],["Bench goal (lbs)","benchT"],["Squat now (lbs)","squatC"],["Squat goal (lbs)","squatT"],["Deadlift now (lbs)","dlC"],["Deadlift goal (lbs)","dlT"],["Training kcal","trainCal"],["Rest kcal","restCal"]].map(([l,k])=>(
                   <div key={k} style={{flex:"1 1 calc(33% - 8px)",minWidth:90}}>
-                    <p style={{margin:"0 0 3px",fontSize:9,color:C.muted,fontFamily:FC,textTransform:"uppercase"}}>{l}</p>
+                    <p style={{margin:"0 0 3px",fontSize:11,color:C.muted,fontFamily:FC,textTransform:"uppercase"}}>{l}</p>
                     <input value={baseVals[k]} onChange={e=>setBaseForm({...baseVals,[k]:e.target.value})} type="number"
                       style={{width:"100%",background:C.surface,border:`1px solid ${C.border}`,borderRadius:8,padding:"8px",color:C.text,fontSize:15,fontFamily:FC,outline:"none",textAlign:"center"}}/>
                   </div>
@@ -2953,12 +3352,12 @@ function AppInner({pin, user, onLogout}){
               <p style={{margin:"0 0 12px",fontSize:18,fontFamily:FD}}>Daily Weight + Sleep</p>
               <div style={{display:"flex",gap:8,marginBottom:8}}>
                 <div style={{flex:1}}>
-                  <p style={{margin:"0 0 3px",fontSize:9,color:C.muted,fontFamily:FC,textTransform:"uppercase"}}>Weight (lbs)</p>
+                  <p style={{margin:"0 0 3px",fontSize:11,color:C.muted,fontFamily:FC,textTransform:"uppercase"}}>Weight (lbs)</p>
                   <input value={logW} onChange={e=>setLogW(e.target.value)} placeholder={myStats?String(myStats.weight):""} type="number"
                     style={{width:"100%",background:C.surface,border:`1px solid ${C.border}`,borderRadius:8,padding:"10px",color:C.text,fontSize:18,fontFamily:FC,outline:"none",textAlign:"center"}}/>
                 </div>
                 <div style={{flex:1}}>
-                  <p style={{margin:"0 0 3px",fontSize:9,color:C.muted,fontFamily:FC,textTransform:"uppercase"}}>Sleep (hrs)</p>
+                  <p style={{margin:"0 0 3px",fontSize:11,color:C.muted,fontFamily:FC,textTransform:"uppercase"}}>Sleep (hrs)</p>
                   <input value={logSleep} onChange={e=>setLogSleep(e.target.value)} placeholder="6.5" type="number"
                     style={{width:"100%",background:C.surface,border:`1px solid ${C.border}`,borderRadius:8,padding:"10px",color:C.text,fontSize:18,fontFamily:FC,outline:"none",textAlign:"center"}}/>
                 </div>
@@ -2968,16 +3367,16 @@ function AppInner({pin, user, onLogout}){
               <button onClick={saveWeight} style={{width:"100%",background:C.yellow,color:"#000",border:"none",borderRadius:8,padding:"12px",fontSize:14,fontWeight:"bold",cursor:"pointer",fontFamily:FC,textTransform:"uppercase",letterSpacing:"0.1em"}}>SAVE</button>
               {(data.wlog||[]).length>0&&(
                 <div style={{marginTop:12}}>
-                  <p style={{margin:"0 0 4px",fontSize:10,color:C.muted,fontFamily:FC,letterSpacing:"0.12em",textTransform:"uppercase"}}>History</p>
+                  <p style={{margin:"0 0 4px",fontSize:12,color:C.muted,fontFamily:FC,letterSpacing:"0.12em",textTransform:"uppercase"}}>History</p>
                   {(data.wlog||[]).slice().reverse().slice(0,10).map((e,i)=>(
                     <div key={i} style={{display:"flex",justifyContent:"space-between",gap:8,padding:"5px 0",borderBottom:`1px solid ${C.border}33`}}>
-                      <span style={{fontSize:11,color:C.muted,fontFamily:FB}}>{e.date}</span>
+                      <span style={{fontSize:12,color:C.muted,fontFamily:FB}}>{e.date}</span>
                       <span style={{fontSize:12,fontFamily:FC,textAlign:"right"}}><span style={{color:C.yellow,fontWeight:"bold"}}>{e.w}lbs</span>{e.sleep?` \u00b7 ${e.sleep}h sleep`:""}{e.n?` \u00b7 ${e.n}`:""}</span>
                     </div>
                   ))}
                 </div>
               )}
-              {(data.wlog||[]).length===0&&<p style={{margin:"10px 0 0",fontSize:11,color:C.muted,fontFamily:FB}}>No entries yet — your saved weight and sleep entries will appear here.</p>}
+              {(data.wlog||[]).length===0&&<p style={{margin:"10px 0 0",fontSize:12,color:C.muted,fontFamily:FB}}>No entries yet — your saved weight and sleep entries will appear here.</p>}
             </div>
 
             {/* Weight + Sleep chart */}
@@ -2995,7 +3394,7 @@ function AppInner({pin, user, onLogout}){
                 <div style={{background:C.card,borderRadius:12,padding:"14px 16px",marginBottom:12,border:`1px solid ${C.border}`}}>
                   <div style={{display:"flex",justifyContent:"space-between",marginBottom:8}}>
                     <p style={{margin:0,fontSize:16,fontFamily:FD}}>Weight + Sleep Trends</p>
-                    <span style={{fontSize:11,color:avgSleep>=7?C.green:avgSleep>=6?C.yellow:C.red,fontFamily:FC}}>
+                    <span style={{fontSize:12,color:avgSleep>=7?C.green:avgSleep>=6?C.yellow:C.red,fontFamily:FC}}>
                       Avg sleep: {avgSleep.toFixed(1)}h
                     </span>
                   </div>
@@ -3005,15 +3404,15 @@ function AppInner({pin, user, onLogout}){
                     {wVals.map((v,i)=><circle key={i} cx={(i/(wVals.length-1))*(W-20)+10} cy={H-10-((v-wMin)/(wMax-wMin))*(H-20)} r="3" fill={C.yellow}/>)}
                   </svg>
                   <div style={{display:"flex",gap:12,marginBottom:8}}>
-                    <span style={{fontSize:10,color:C.yellow,fontFamily:FC}}>— Weight</span>
-                    <span style={{fontSize:10,color:C.blue,fontFamily:FC}}>-- Sleep</span>
-                    <span style={{fontSize:10,color:logSleep>=7?C.green:C.red,fontFamily:FC}}>
+                    <span style={{fontSize:12,color:C.yellow,fontFamily:FC}}>— Weight</span>
+                    <span style={{fontSize:12,color:C.blue,fontFamily:FC}}>-- Sleep</span>
+                    <span style={{fontSize:12,color:logSleep>=7?C.green:C.red,fontFamily:FC}}>
                       Target: 7h {avgSleep>=7?"ACHIEVED":"in progress"}
                     </span>
                   </div>
                   {entries.slice().reverse().slice(0,5).map((e,i)=>(
                     <div key={i} style={{display:"flex",justifyContent:"space-between",padding:"5px 0",borderBottom:i<4?`1px solid ${C.border}33`:"none"}}>
-                      <span style={{fontSize:11,color:C.muted,fontFamily:FB}}>{e.date}</span>
+                      <span style={{fontSize:12,color:C.muted,fontFamily:FB}}>{e.date}</span>
                       <div style={{display:"flex",gap:12}}>
                         <span style={{fontSize:13,fontWeight:"bold",color:C.yellow,fontFamily:FC}}>{e.w}lbs</span>
                         {e.sleep&&<span style={{fontSize:12,color:parseFloat(e.sleep)>=7?C.green:parseFloat(e.sleep)>=6?C.yellow:C.red,fontFamily:FC}}>{e.sleep}h</span>}
@@ -3030,7 +3429,7 @@ function AppInner({pin, user, onLogout}){
               <div style={{display:"flex",gap:8,marginBottom:8}}>
                 {[["Weight",myStats?String(myStats.weight):"",scanW,setScanW],["BF%",myStats?String(myStats.bf):"",scanBF,setScanBF],["Muscle",myStats&&myStats.muscle?String(myStats.muscle):"",scanM,setScanM]].map(([l,ph2,v,sv])=>(
                   <div key={l} style={{flex:1}}>
-                    <p style={{margin:"0 0 3px",fontSize:9,color:C.muted,fontFamily:FC,textTransform:"uppercase"}}>{l}</p>
+                    <p style={{margin:"0 0 3px",fontSize:11,color:C.muted,fontFamily:FC,textTransform:"uppercase"}}>{l}</p>
                     <input value={v} onChange={e=>sv(e.target.value)} placeholder={ph2} type="number"
                       style={{width:"100%",background:C.surface,border:`1px solid ${C.border}`,borderRadius:8,padding:"9px 8px",color:C.text,fontSize:15,fontFamily:FC,outline:"none",textAlign:"center"}}/>
                   </div>
@@ -3041,26 +3440,26 @@ function AppInner({pin, user, onLogout}){
               <button onClick={saveScan} style={{width:"100%",background:C.yellow,color:"#000",border:"none",borderRadius:8,padding:"12px",fontSize:14,fontWeight:"bold",cursor:"pointer",fontFamily:FC,textTransform:"uppercase",letterSpacing:"0.1em"}}>SAVE SCAN</button>
               {scans.length>0&&(
                 <div style={{marginTop:12}}>
-                  <p style={{margin:"0 0 4px",fontSize:10,color:C.muted,fontFamily:FC,letterSpacing:"0.12em",textTransform:"uppercase"}}>History</p>
+                  <p style={{margin:"0 0 4px",fontSize:12,color:C.muted,fontFamily:FC,letterSpacing:"0.12em",textTransform:"uppercase"}}>History</p>
                   {scans.slice().reverse().slice(0,10).map((s,i)=>(
                     <div key={i} style={{display:"flex",justifyContent:"space-between",gap:8,padding:"5px 0",borderBottom:`1px solid ${C.border}33`}}>
-                      <span style={{fontSize:11,color:C.muted,fontFamily:FB}}>{s.date}</span>
+                      <span style={{fontSize:12,color:C.muted,fontFamily:FB}}>{s.date}</span>
                       <span style={{fontSize:12,fontFamily:FC}}><span style={{color:C.yellow,fontWeight:"bold"}}>{s.w||"-"}lbs</span>{s.bf?` \u00b7 ${s.bf}% BF`:""}{s.m?` \u00b7 ${s.m} muscle`:""}</span>
                     </div>
                   ))}
                 </div>
               )}
-              {scans.length===0&&<p style={{margin:"10px 0 0",fontSize:11,color:C.muted,fontFamily:FB}}>No scans yet — your saved Hume scans will appear here.</p>}
+              {scans.length===0&&<p style={{margin:"10px 0 0",fontSize:12,color:C.muted,fontFamily:FB}}>No scans yet — your saved Hume scans will appear here.</p>}
             </div>
 
             {/* Body measurements */}
             <div style={{background:C.card,borderRadius:12,padding:"14px 16px",marginBottom:12,border:`1px solid ${C.border}`}}>
               <p style={{margin:"0 0 4px",fontSize:18,fontFamily:FD}}>Body Measurements</p>
-              <p style={{margin:"0 0 12px",fontSize:11,color:C.muted,fontFamily:FB}}>Log with a tape measure every 2 weeks. Same time, morning, relaxed.</p>
+              <p style={{margin:"0 0 12px",fontSize:12,color:C.muted,fontFamily:FB}}>Log with a tape measure every 2 weeks. Same time, morning, relaxed.</p>
               <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:8}}>
                 {[["Waist",mWaist,setMWaist],["Chest",mChest,setMChest],["R Arm",mRArm,setMRArm],["L Arm",mLArm,setMLArm],["Shoulder",mShould,setMShould]].map(([l,v,sv])=>(
                   <div key={l} style={{flex:"1 1 calc(50% - 8px)",minWidth:80}}>
-                    <p style={{margin:"0 0 3px",fontSize:9,color:C.muted,fontFamily:FC,textTransform:"uppercase"}}>{l} (in)</p>
+                    <p style={{margin:"0 0 3px",fontSize:11,color:C.muted,fontFamily:FC,textTransform:"uppercase"}}>{l} (in)</p>
                     <input value={v} onChange={e=>sv(e.target.value)} placeholder="0.0" type="number"
                       style={{width:"100%",background:C.surface,border:`1px solid ${C.border}`,borderRadius:8,padding:"8px",color:C.text,fontSize:16,fontFamily:FC,outline:"none",textAlign:"center"}}/>
                   </div>
@@ -3077,12 +3476,12 @@ function AppInner({pin, user, onLogout}){
                 <p style={{margin:"0 0 12px",fontSize:16,fontFamily:FD}}>Measurement History</p>
                 {(data.measurements||[]).slice().reverse().slice(0,10).map((m,i)=>(
                   <div key={i} style={{padding:"8px 0",borderBottom:i<(data.measurements||[]).length-1?`1px solid ${C.border}33`:"none"}}>
-                    <p style={{margin:"0 0 4px",fontSize:11,color:C.muted,fontFamily:FB}}>{m.date}</p>
+                    <p style={{margin:"0 0 4px",fontSize:12,color:C.muted,fontFamily:FB}}>{m.date}</p>
                     <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-                      {m.waist&&<span style={{fontSize:11,fontFamily:FC,color:C.text}}>Waist: <span style={{color:C.yellow,fontWeight:"bold"}}>{m.waist}"</span></span>}
-                      {m.chest&&<span style={{fontSize:11,fontFamily:FC,color:C.text}}>Chest: <span style={{color:C.yellow,fontWeight:"bold"}}>{m.chest}"</span></span>}
-                      {m.rarm&&<span style={{fontSize:11,fontFamily:FC,color:C.text}}>R Arm: <span style={{color:C.yellow,fontWeight:"bold"}}>{m.rarm}"</span></span>}
-                      {m.shoulder&&<span style={{fontSize:11,fontFamily:FC,color:C.text}}>Shoulder: <span style={{color:C.yellow,fontWeight:"bold"}}>{m.shoulder}"</span></span>}
+                      {m.waist&&<span style={{fontSize:12,fontFamily:FC,color:C.text}}>Waist: <span style={{color:C.yellow,fontWeight:"bold"}}>{m.waist}"</span></span>}
+                      {m.chest&&<span style={{fontSize:12,fontFamily:FC,color:C.text}}>Chest: <span style={{color:C.yellow,fontWeight:"bold"}}>{m.chest}"</span></span>}
+                      {m.rarm&&<span style={{fontSize:12,fontFamily:FC,color:C.text}}>R Arm: <span style={{color:C.yellow,fontWeight:"bold"}}>{m.rarm}"</span></span>}
+                      {m.shoulder&&<span style={{fontSize:12,fontFamily:FC,color:C.text}}>Shoulder: <span style={{color:C.yellow,fontWeight:"bold"}}>{m.shoulder}"</span></span>}
                     </div>
                   </div>
                 ))}
@@ -3109,7 +3508,7 @@ function AppInner({pin, user, onLogout}){
                       <span style={{fontSize:12,color:C.text,fontFamily:FC}}>{ex.n}</span>
                       <div style={{textAlign:"right"}}>
                         <span style={{fontSize:14,fontWeight:"bold",color:C.yellow,fontFamily:FC}}>{best.rm}lb 1RM</span>
-                        <p style={{margin:0,fontSize:9,color:C.muted,fontFamily:FB}}>{best.w}lb x {best.r}</p>
+                        <p style={{margin:0,fontSize:11,color:C.muted,fontFamily:FB}}>{best.w}lb x {best.r}</p>
                       </div>
                     </div>
                   );
@@ -3117,8 +3516,8 @@ function AppInner({pin, user, onLogout}){
               )}
               {/* Big 3 targets */}
               <div style={{marginTop:10,background:C.surface,borderRadius:8,padding:"10px 12px",border:`1px solid ${C.border}`}}>
-                <p style={{margin:"0 0 6px",fontSize:11,color:C.yellow,fontFamily:FC,letterSpacing:"0.1em",textTransform:"uppercase"}}>THE MISSION - BIG 3</p>
-                {needsSetup&&<p style={{margin:"0 0 6px",fontSize:11,color:C.yellow,fontFamily:FB}}>Set {user.name}'s baselines above to see personal record targets here.</p>}
+                <p style={{margin:"0 0 6px",fontSize:12,color:C.yellow,fontFamily:FC,letterSpacing:"0.1em",textTransform:"uppercase"}}>THE MISSION - BIG 3</p>
+                {needsSetup&&<p style={{margin:"0 0 6px",fontSize:12,color:C.yellow,fontFamily:FB}}>Set {user.name}'s baselines above to see personal record targets here.</p>}
                 {(myStats&&myStats.prs?[{name:"Bench Press",current:myStats.prs.bench.c+"lb",target:myStats.prs.bench.t+"lb+"},{name:"Back Squat",current:myStats.prs.squat.c+"lb",target:myStats.prs.squat.t+"lb+"},{name:"Deadlift",current:myStats.prs.deadlift.c+"lb",target:myStats.prs.deadlift.t+"lb+"}]:[]).map((l,i)=>(
                   <div key={i} style={{display:"flex",justifyContent:"space-between",padding:"5px 0",borderBottom:i<2?`1px solid ${C.border}33`:"none"}}>
                     <span style={{fontSize:12,fontFamily:FC,color:C.text}}>{l.name}</span>
@@ -3131,114 +3530,58 @@ function AppInner({pin, user, onLogout}){
             {/* BF journey */}
             <div style={{background:C.card,borderRadius:12,padding:"14px 16px",marginBottom:8,border:`1px solid ${C.border}`}}>
               <p style={{margin:"0 0 12px",fontSize:16,fontFamily:FD}}>BF% Journey</p>
-              {needsSetup&&<p style={{margin:"0 0 8px",fontSize:11,color:C.yellow,fontFamily:FB}}>Set {user.name}'s baselines above to start the journey.</p>}
+              {needsSetup&&<p style={{margin:"0 0 8px",fontSize:12,color:C.yellow,fontFamily:FB}}>Set {user.name}'s baselines above to start the journey.</p>}
               {(needsSetup?[]:[{l:"Start",v:bfStart,c:C.red},{l:"Phase 1 end",v:myStats.journey?myStats.journey[1]:bfStart,c:C.yellow},{l:"Phase 2 end",v:myStats.journey?myStats.journey[2]:bfStart,c:C.yellow},{l:"Summer goal",v:bfGoal,c:C.green}]).map((p,i)=>(
                 <div key={i} style={{display:"flex",alignItems:"center",gap:10,marginBottom:8}}>
-                  <span style={{fontSize:11,color:C.muted,minWidth:90,fontFamily:FC}}>{p.l}</span>
+                  <span style={{fontSize:12,color:C.muted,minWidth:90,fontFamily:FC}}>{p.l}</span>
                   <div style={{flex:1,background:C.border,borderRadius:3,height:6}}>
                     <div style={{background:p.c,width:`${((p.v-8)/(12-8))*100}%`,height:"100%",borderRadius:3}}/>
                   </div>
                   <span style={{fontSize:12,fontWeight:"bold",color:p.c,minWidth:36,textAlign:"right",fontFamily:FC}}>{p.v}%</span>
                 </div>
               ))}
-              {!needsSetup&&<p style={{margin:"8px 0 0",fontSize:11,color:C.muted,fontFamily:FB}}>Current: <span style={{color:C.yellow,fontWeight:"bold"}}>{curBF.toFixed(1)}%</span> — {(curBF-bfGoal).toFixed(1)}% to go</p>}
-            </div>
-          </div>
-        )}
-
-        {/* ══ REHAB TAB ════════════════════════════════════════════════════ */}
-        {tab==="mobility"&&(
-          <div>
-            {/* Baseline assessment */}
-            <div style={{background:C.card,borderRadius:12,padding:"14px 16px",marginBottom:14,border:`1px solid ${C.purple}44`}}>
-              {assessment?(
-                <>
-                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
-                    <p style={{margin:0,fontSize:16,fontWeight:600,fontFamily:FD,color:C.purple}}>Your Priorities</p>
-                    <button onClick={()=>setAssessmentOpen(true)} style={{background:"none",border:`1px solid ${C.border}`,borderRadius:6,padding:"3px 8px",fontSize:9,color:C.muted,fontFamily:FC,cursor:"pointer"}}>RETAKE</button>
-                  </div>
-                  <p style={{margin:0,fontSize:12,color:C.steel,fontFamily:FB,lineHeight:1.5}}>
-                    Based on your assessment, focus on: {assessment.priorities.map(a=>ASSESSMENT_QUESTIONS.find(q=>q.area===a)?.label).filter(Boolean).join(", ")||"general mobility"}.
-                  </p>
-                </>
-              ):(
-                <>
-                  <p style={{margin:"0 0 6px",fontSize:16,fontWeight:600,fontFamily:FD,color:C.purple}}>Take Your Baseline Assessment</p>
-                  <p style={{margin:"0 0 10px",fontSize:12,color:C.muted,fontFamily:FB,lineHeight:1.5}}>5 quick questions on ankles, hips, shoulders, squat depth, and balance — surfaces what to prioritize below.</p>
-                  <button onClick={()=>setAssessmentOpen(true)} style={{width:"100%",background:C.purple,color:"#fff",border:"none",borderRadius:8,padding:"11px",fontSize:13,fontWeight:"bold",cursor:"pointer",fontFamily:FC,letterSpacing:"0.08em"}}>START ASSESSMENT</button>
-                </>
-              )}
+              {!needsSetup&&<p style={{margin:"8px 0 0",fontSize:12,color:C.muted,fontFamily:FB}}>Current: <span style={{color:C.yellow,fontWeight:"bold"}}>{curBF.toFixed(1)}%</span> — {(curBF-bfGoal).toFixed(1)}% to go</p>}
             </div>
 
-            {/* Recommended */}
-            {recommendedRoutines.length>0&&(
-              <div style={{marginBottom:14}}>
-                <p style={{margin:"0 0 8px",fontSize:11,color:C.yellow,letterSpacing:"0.15em",textTransform:"uppercase",fontFamily:FC}}>Recommended For You</p>
-                {recommendedRoutines.map(r=>(
-                  <div key={r.id} style={{background:C.card,borderRadius:12,padding:"12px 14px",marginBottom:8,border:`1px solid ${C.yellow}55`,display:"flex",justifyContent:"space-between",alignItems:"center",gap:10}}>
-                    <div>
-                      <p style={{margin:0,fontSize:13,fontFamily:FC,fontWeight:700}}>{r.title}</p>
-                      <p style={{margin:0,fontSize:10,color:C.muted,fontFamily:FB}}>{r.time}</p>
+            {/* Progress charts */}
+            <div style={{background:C.card,borderRadius:12,padding:"14px 16px",marginBottom:12,border:`1px solid ${C.border}`}}>
+              <p style={{margin:"0 0 12px",fontSize:16,fontFamily:FD}}>Progress Charts</p>
+              <p style={{margin:"0 0 8px",fontSize:12,color:C.muted,fontFamily:FC,letterSpacing:"0.12em",textTransform:"uppercase"}}>Strength Trends · est. 1RM</p>
+              {strengthTrends.length===0&&<p style={{margin:"0 0 12px",fontSize:12,color:C.muted,fontFamily:FB,lineHeight:1.5}}>Log the same lift in 2+ weeks to see strength trends here.</p>}
+              {strengthTrends.map(t=>{
+                const maxV=Math.max(...t.series.map(s=>s.v));
+                return(
+                  <div key={t.name} style={{marginBottom:12}}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",gap:8}}>
+                      <span style={{fontSize:12,fontFamily:FC,color:C.text}}>{t.name}</span>
+                      <span style={{fontSize:12,fontFamily:FC,color:C.muted}}>{t.first} → <span style={{color:C.text,fontWeight:"bold"}}>{t.latest}</span> lb <span style={{color:t.delta>=0?C.green:C.red,fontWeight:"bold"}}>{t.delta>=0?"+":""}{t.delta.toFixed(1)}%</span></span>
                     </div>
-                    <button onClick={()=>setRunningRoutine(r)} style={{flexShrink:0,background:C.yellow,color:"#000",border:"none",borderRadius:8,padding:"8px 14px",fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:FC}}>RUN</button>
+                    <div style={{display:"flex",alignItems:"flex-end",gap:3,height:38,marginTop:4}}>
+                      {t.series.map(s=>(
+                        <div key={s.w} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:2}}>
+                          <div style={{width:"100%",height:Math.max(3,Math.round(s.v/maxV*26)),background:pc,borderRadius:2,opacity:0.85}}/>
+                          <span style={{fontSize:8,color:C.muted,fontFamily:FC}}>W{s.w}</span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                ))}
-              </div>
-            )}
-
-            {/* Chain reaction info (kept from original) */}
-            <div style={{background:C.card,borderRadius:12,padding:"14px 16px",marginBottom:14,border:`1px solid ${C.yellow}33`}}>
-              <p style={{margin:"0 0 6px",fontSize:18,fontWeight:600,fontFamily:FD,color:C.yellow}}>The Chain Reaction</p>
-              <p style={{margin:0,fontSize:12,color:C.muted,lineHeight:1.7,fontFamily:FB}}>
-                <span style={{color:C.yellow}}>Tight feet/ankles</span> - restrict hips - anterior pelvic tilt - stress lumbar - limit thoracic - restrict shoulders - stress AC joint. Fix from the ground up. 10 min daily.
-              </p>
-            </div>
-
-            {/* Routine library grouped by domain */}
-            {mobilityByDomain.map(d=>(
-              <div key={d.id} style={{marginBottom:16}}>
-                <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
-                  <span style={{width:8,height:8,borderRadius:"50%",background:d.color}}/>
-                  <p style={{margin:0,fontSize:13,fontFamily:FC,fontWeight:700,color:d.color,textTransform:"uppercase",letterSpacing:"0.1em"}}>{d.label}</p>
-                  <p style={{margin:0,fontSize:10,color:C.muted,fontFamily:FB}}>{d.desc}</p>
+                );
+              })}
+              <p style={{margin:"14px 0 8px",fontSize:12,color:C.muted,fontFamily:FC,letterSpacing:"0.12em",textTransform:"uppercase"}}>Weekly Adherence</p>
+              {!adherence&&<p style={{margin:0,fontSize:12,color:C.muted,fontFamily:FB,lineHeight:1.5}}>No completed exercises yet — finish a session and your weekly adherence will show here.</p>}
+              {adherence&&adherence.map(r=>(
+                <div key={r.w} style={{display:"flex",alignItems:"center",gap:10,marginBottom:6}}>
+                  <span style={{fontSize:12,color:C.muted,minWidth:28,fontFamily:FC}}>W{r.w}</span>
+                  <div style={{flex:1,background:C.border,borderRadius:3,height:8}}>
+                    <div style={{background:r.pct>=80?C.green:r.pct>=50?C.yellow:C.red,width:`${r.pct}%`,height:"100%",borderRadius:3}}/>
+                  </div>
+                  <span style={{fontSize:12,fontWeight:"bold",color:C.text,minWidth:36,textAlign:"right",fontFamily:FC}}>{r.pct}%</span>
                 </div>
-                {d.routines.map(r=>(
-                  <div key={r.id} style={{background:C.card,borderRadius:12,padding:"12px 14px",marginBottom:8,border:`1px solid ${C.border}`}}>
-                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6,flexWrap:"wrap",gap:4}}>
-                      <p style={{margin:0,fontSize:14,fontFamily:FC,fontWeight:700}}>{r.title}</p>
-                      <div style={{display:"flex",gap:6,alignItems:"center"}}>
-                        {r.pri&&<span style={{fontSize:9,padding:"2px 7px",borderRadius:4,background:r.pri==="CRITICAL"?C.red+"33":r.pri==="HIGH"?C.yellow+"22":C.border,color:r.pri==="CRITICAL"?C.red:r.pri==="HIGH"?C.yellow:C.muted,fontFamily:FC}}>{r.pri}</span>}
-                        <span style={{fontSize:9,padding:"2px 7px",borderRadius:4,background:C.surface,color:C.steel,fontFamily:FC}}>{r.time}</span>
-                      </div>
-                    </div>
-                    <p style={{margin:"0 0 8px",fontSize:12,color:C.muted,lineHeight:1.6,fontFamily:FB}}>{r.body}</p>
-                    <button onClick={()=>setRunningRoutine(r)} style={{background:d.color,color:"#000",border:"none",borderRadius:7,padding:"7px 14px",fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:FC}}>RUN ROUTINE</button>
-                  </div>
-                ))}
-              </div>
-            ))}
-
-            {/* Recent mobility history */}
-            {mobilityLog.length>0&&(
-              <div style={{background:C.card,borderRadius:12,padding:"14px 16px",border:`1px solid ${C.border}`,marginBottom:8}}>
-                <p style={{margin:"0 0 10px",fontSize:14,fontFamily:FC,fontWeight:700}}>Recent Sessions</p>
-                {mobilityLog.slice().reverse().slice(0,5).map((e,i)=>(
-                  <div key={i} style={{display:"flex",justifyContent:"space-between",padding:"5px 0",borderBottom:i<4?`1px solid ${C.border}33`:"none"}}>
-                    <span style={{fontSize:11,color:C.muted,fontFamily:FB}}>{e.date}</span>
-                    <span style={{fontSize:12,color:C.text,fontFamily:FC}}>{e.title}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            <div style={{background:C.card,borderRadius:12,padding:"14px 16px",border:`1px solid ${C.border}`,marginBottom:8}}>
-              <p style={{margin:"0 0 10px",fontSize:14,fontFamily:FC,fontWeight:700,color:C.red}}>NEVER DO (AC Joint)</p>
-              {["Behind-the-neck press or pulldown","Wide-grip upright rows","Max weight barbell flat bench - use DBs","Sleeping on your right shoulder"].map((r,i)=>(
-                <p key={i} style={{margin:"0 0 6px",fontSize:12,color:C.muted,fontFamily:FB}}><span style={{color:C.red}}>X </span>{r}</p>
               ))}
             </div>
           </div>
         )}
+
 
         {/* ══ SKILLS TAB ═══════════════════════════════════════════════════ */}
         {tab==="skills"&&(
@@ -3258,16 +3601,16 @@ function AppInner({pin, user, onLogout}){
                 <div key={sk.id} style={{background:C.card,borderRadius:12,padding:"14px 16px",marginBottom:12,border:`1px solid ${matchesGoal?C.yellow+"55":C.border}`}}>
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
                     <p style={{margin:0,fontSize:17,fontFamily:FD,color:matchesGoal?C.yellow:C.text}}>{sk.label}</p>
-                    <span style={{fontSize:10,color:C.muted,fontFamily:FC}}>LVL {state.level+1}/{sk.levels.length}</span>
+                    <span style={{fontSize:12,color:C.muted,fontFamily:FC}}>LVL {state.level+1}/{sk.levels.length}</span>
                   </div>
                   <div style={{width:"100%",height:4,background:C.border,borderRadius:2,marginBottom:10}}>
                     <div style={{width:`${((state.level+1)/sk.levels.length)*100}%`,height:"100%",background:matchesGoal?C.yellow:C.steel,borderRadius:2}}/>
                   </div>
                   <p style={{margin:0,fontSize:13,fontFamily:FC,fontWeight:700,color:C.text}}>{current.title}</p>
-                  <p style={{margin:"2px 0 10px",fontSize:11,color:C.muted,fontFamily:FB,lineHeight:1.5}}>{current.criteria}</p>
+                  <p style={{margin:"2px 0 10px",fontSize:12,color:C.muted,fontFamily:FB,lineHeight:1.5}}>{current.criteria}</p>
                   {!atMax&&(
                     <div style={{background:C.surface,borderRadius:8,padding:"8px 10px",marginBottom:10,border:`1px solid ${C.border}`}}>
-                      <p style={{margin:0,fontSize:10,color:C.steel,fontFamily:FB}}>Next: <span style={{color:C.text}}>{next.title}</span> — {next.criteria}</p>
+                      <p style={{margin:0,fontSize:12,color:C.steel,fontFamily:FB}}>Next: <span style={{color:C.text}}>{next.title}</span> — {next.criteria}</p>
                     </div>
                   )}
                   <div style={{display:"flex",gap:6,marginBottom:10}}>
@@ -3275,7 +3618,7 @@ function AppInner({pin, user, onLogout}){
                       style={{width:70,background:C.surface,border:`1px solid ${C.border}`,borderRadius:7,padding:"8px",color:C.text,fontSize:12,fontFamily:FC,outline:"none",textAlign:"center"}}/>
                     <input value={draft.note} onChange={e=>setSkillLogDraft({...skillLogDraft,[sk.id]:{...draft,note:e.target.value}})} placeholder="Notes..."
                       style={{flex:1,background:C.surface,border:`1px solid ${C.border}`,borderRadius:7,padding:"8px 10px",color:C.text,fontSize:12,fontFamily:FB,outline:"none"}}/>
-                    <button onClick={()=>logSkillPractice(sk.id)} style={{background:C.steel,color:"#000",border:"none",borderRadius:7,padding:"8px 12px",fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:FC}}>LOG</button>
+                    <button onClick={()=>logSkillPractice(sk.id)} style={{background:C.steel,color:"#000",border:"none",borderRadius:7,padding:"8px 12px",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:FC}}>LOG</button>
                   </div>
                   <button onClick={()=>handleAdvanceSkill(sk)} disabled={atMax}
                     style={{width:"100%",background:atMax?C.border:armedSkill===sk.id?C.red:C.yellow,color:atMax?C.muted:armedSkill===sk.id?"#fff":"#000",border:"none",borderRadius:8,padding:"10px",fontSize:12,fontWeight:700,cursor:atMax?"default":"pointer",fontFamily:FC,letterSpacing:"0.08em"}}>
@@ -3283,14 +3626,14 @@ function AppInner({pin, user, onLogout}){
                   </button>
                   {state.level>0&&(
                     <button onClick={()=>regressSkillLevel(sk.id)}
-                      style={{width:"100%",marginTop:6,background:"none",border:"none",color:C.muted,fontSize:10,cursor:"pointer",fontFamily:FC,letterSpacing:"0.08em"}}>
+                      style={{width:"100%",marginTop:6,background:"none",border:"none",color:C.muted,fontSize:12,cursor:"pointer",fontFamily:FC,letterSpacing:"0.08em"}}>
                       ← BACK A LEVEL
                     </button>
                   )}
                   {(state.log||[]).length>0&&(
                     <div style={{marginTop:10}}>
                       {state.log.slice().reverse().slice(0,3).map((e,i)=>(
-                        <p key={i} style={{margin:"0 0 4px",fontSize:10,color:C.muted,fontFamily:FB}}>
+                        <p key={i} style={{margin:"0 0 4px",fontSize:12,color:C.muted,fontFamily:FB}}>
                           {e.date}{e.holdSeconds?` · ${e.holdSeconds}s`:""}{e.note?` · ${e.note}`:""}
                         </p>
                       ))}
@@ -3309,7 +3652,7 @@ function AppInner({pin, user, onLogout}){
         {NAV.map(n=>(
           <button key={n.id} onClick={()=>setTab(n.id)} style={{flex:1,background:"none",border:"none",padding:"12px 4px 2px",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:5}}>
             <Ic n={n.ic} sz={19} col={tab===n.id?pc:C.muted}/>
-            <span style={{fontSize:9,color:tab===n.id?pc:C.muted,fontWeight:tab===n.id?600:500,fontFamily:FB}}>{n.lb}</span>
+            <span style={{fontSize:11,color:tab===n.id?pc:C.muted,fontWeight:tab===n.id?600:500,fontFamily:FB}}>{n.lb}</span>
           </button>
         ))}
       </div>
