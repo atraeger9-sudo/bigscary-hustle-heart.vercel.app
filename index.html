@@ -1633,7 +1633,7 @@ const SuppCard=({s,showCaff})=>{
 };
 
 // ── LOG MODAL (Full Progressive Overload) ─────────────────────────────────
-const LogModal=({ex,pc,lastSets,targets,week,phase,allHistory,onSave,onClose})=>{
+const LogModal=({ex,hasNext,pc,lastSets,targets,week,phase,allHistory,onSave,onClose})=>{
   const baseline=!week||week<=1;
   const deloadWeek=isDeload(week||1);
   const compound=isCompound(ex.n);
@@ -1912,7 +1912,7 @@ const LogModal=({ex,pc,lastSets,targets,week,phase,allHistory,onSave,onClose})=>
             <RIRSelect value={burnout.rir} onChange={v=>updB("rir",v)}/>
             <button onClick={()=>{onSave([...sets,{...burnout,isBurnout:true,logged:true}],sessionNote);}}
               style={{width:"100%",marginTop:12,background:C.red,color:"#fff",border:"none",borderRadius:14,padding:"14px",fontSize:14,fontWeight:600,cursor:"pointer",fontFamily:FD,letterSpacing:"0.02em"}}>
-              Save + Finish Session
+              {hasNext?"Save + Next Exercise":"Save + Finish Session"}
             </button>
           </div>
         )}
@@ -1929,7 +1929,7 @@ const LogModal=({ex,pc,lastSets,targets,week,phase,allHistory,onSave,onClose})=>
         {phase===0&&(
           <button onClick={()=>onSave(sets,sessionNote)}
             style={{width:"100%",background:pc,color:"#000",border:"none",borderRadius:10,padding:"14px",fontSize:15,fontWeight:"bold",cursor:"pointer",fontFamily:FC,letterSpacing:"0.1em",marginTop:12,textTransform:"uppercase"}}>
-            SAVE ALL SETS
+            {hasNext?"SAVE + NEXT EXERCISE":"SAVE ALL SETS"}
           </button>
         )}
       </div>
@@ -2593,6 +2593,16 @@ function AppInner({pin, user, onLogout}){
     return names;
   })();
 
+  const nextExIdx=(fromIdx,src)=>{
+    const exs=WO[ph][di].ex;
+    for(let j=fromIdx+1;j<exs.length;j++){
+      if(sixtyMinMode&&exs[j].opt)continue;
+      if(src[DK(ph,di,j,currentWeek)])continue;
+      return j;
+    }
+    return -1;
+  };
+
   const saveLog=(ei,sets,note)=>{
     const nd={...data,
       [SK2(ph,di,ei)]:sets,
@@ -2605,10 +2615,16 @@ function AppInner({pin, user, onLogout}){
       nd.sessionNotes=notes;
     }
     persist(nd);
-    setLm(null);
-    // Check if all exercises done
-    const allDone=WO[ph][di].ex.every((ex,i)=>(sixtyMinMode&&ex.opt)||i===ei||!!nd[DK(ph,di,i,currentWeek)]);
-    if(allDone)setSessionDone(true);
+    // Advance straight into the next unlogged exercise; only close when none remain
+    const nx=nextExIdx(ei,nd);
+    if(nx>=0){
+      setLm(nx);
+    } else {
+      setLm(null);
+      // Check if all exercises done
+      const allDone=WO[ph][di].ex.every((ex,i)=>(sixtyMinMode&&ex.opt)||i===ei||!!nd[DK(ph,di,i,currentWeek)]);
+      if(allDone)setSessionDone(true);
+    }
   };
 
   // Daily supplement checklist
@@ -4220,7 +4236,9 @@ function AppInner({pin, user, onLogout}){
       {/* ── MODALS ────────────────────────────────────────────────────────── */}
       {lm!==null&&(
         <LogModal
+          key={`lm_${ph}_${di}_${lm}`}
           ex={wo.ex[lm]}
+          hasNext={nextExIdx(lm,data)>=0}
           pc={pc}
           lastSets={data[`p${ph}_d${di}_e${lm}`]}
           targets={getTargets(lm)}
