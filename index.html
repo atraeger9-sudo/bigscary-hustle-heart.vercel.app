@@ -1925,8 +1925,8 @@ const LogModal=({ex,hasNext,pc,lastSets,targets,week,phase,allHistory,onSave,onC
             style={{width:"100%",background:C.surface,border:`1px solid ${C.border}`,borderRadius:8,padding:"9px 12px",color:C.text,fontSize:13,fontFamily:FB,outline:"none",boxSizing:"border-box"}}/>
         </div>
 
-        {/* Phase 1 save */}
-        {phase===0&&(
+        {/* Standard save: Phase 1, plus deload weeks in later phases (no burnout flow there) */}
+        {(phase===0||deloadWeek)&&(
           <button onClick={()=>onSave(sets,sessionNote)}
             style={{width:"100%",background:pc,color:"#000",border:"none",borderRadius:10,padding:"14px",fontSize:15,fontWeight:"bold",cursor:"pointer",fontFamily:FC,letterSpacing:"0.1em",marginTop:12,textTransform:"uppercase"}}>
             {hasNext?"SAVE + NEXT EXERCISE":"SAVE ALL SETS"}
