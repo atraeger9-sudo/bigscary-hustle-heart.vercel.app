@@ -52,10 +52,11 @@ const FB="'Barlow',sans-serif";
 // ── USERS ─────────────────────────────────────────────────────────────────
 const USERS = {
   "1111": { name: "Andrew", emoji: "d",
-    tagline: "The Recomp \u2014 Build muscle, lose fat, move like an athlete",
+    tagline: "The Gentle Cut \u2014 Lose fat, keep muscle, move like an athlete",
     stats: { weight: 173.5, bf: 11.6, bfGoal: 8.5, muscle: 97.9,
       prs: { bench: {c:205,t:225}, squat: {c:275,t:315}, deadlift: {c:375,t:405} },
-      trainCal: 2885, restCal: 2513, journey: [11.6, 10.5, 9.5, 8.5] } },
+      trainCal: 2600, restCal: 2250, journey: [11.6, 10.5, 9.5, 8.5],
+      trainMacros: {p:210,c:283,f:70}, restMacros: {p:197,c:186,f:80} } },
   "2222": { name: "Beaudy", emoji: "e",
     tagline: "The Recomp \u2014 Build muscle, lose fat, move like an athlete",
     needsSetup: true },
@@ -2344,6 +2345,15 @@ function AppInner({pin, user, onLogout}){
     if(!data.programStart&&!data.weekOverride){
       nd={...(nd||data),programStart:isoDaysAgo((calcCurrentWeek()-1)*7)};
     }
+    // Gentle-deficit migration (Andrew only, one-time): if his saved
+    // stats still hold BOTH untouched old recomp calorie defaults, move
+    // them to the cut targets. Any other combination means he edited a
+    // target himself in Track — leave his numbers alone. No other
+    // profile's data is ever touched here.
+    if(pin==="1111"&&myStats&&myStats.trainCal===2885&&myStats.restCal===2513){
+      const mbase=nd||data;
+      nd={...mbase,stats:{...(mbase.stats||{}),trainCal:2600,restCal:2250}};
+    }
     if(nd)persist(nd);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   },[]);
@@ -2900,25 +2910,35 @@ function AppInner({pin, user, onLogout}){
   // days only, exactly as scheduled.
   const suppsForMeal=(times)=>DAILY_SUPPS.filter(s=>times.includes(s.time)&&(!s.trainOnly||mealDt==="training")).map(s=>s.name);
   // Per-user nutrition: the MEALS plans are a shared template, so scale
-  // the displayed portions to this user's own calorie target. Andrew's
-  // targets equal the template (factor exactly 1), so his numbers are
-  // untouched; anyone else's plan scales to their baselines. Item
+  // the displayed portions to this user's own calorie target. Item
   // description text stays as written — amounts in text are guides.
+  // Macro targets come from USERS stats, keyed by PIN — never from
+  // saved myStats, so they can only ever apply to a profile whose
+  // defaults define them (Andrew's gentle cut). With macro targets,
+  // each macro scales by its own factor (protein holds while carbs and
+  // fat absorb the deficit) and the header shows the target macros
+  // exactly. Without them, fP/fC/fF all equal fuelFactor and the gate
+  // reduces to fuelScaled — the original single-factor path, unchanged.
   const calAdjust=myStats?(parseInt(data.calAdjust)||0):0;
   const aboveBfGoal=myStats?(parseFloat(myStats.bf)||0)>(parseFloat(myStats.bfGoal)||0):false;
   const fuelTargetCal=myStats?(mealDt==="training"?((myStats.trainCal||mpBase.cal)+calAdjust):((myStats.restCal||mpBase.cal)+calAdjust)):mpBase.cal;
   const fuelFactor=(myStats&&fuelTargetCal>0&&mpBase.cal>0)?fuelTargetCal/mpBase.cal:1;
   const fuelScaled=Math.abs(fuelFactor-1)>=0.02;
-  const scaleSection=(sec)=>fuelScaled?{...sec,items:sec.items.map(it=>({...it,
+  const macroTargets=(USERS[pin]&&USERS[pin].stats)?(mealDt==="training"?USERS[pin].stats.trainMacros:USERS[pin].stats.restMacros)||null:null;
+  const fP=macroTargets?macroTargets.p/mpBase.p:fuelFactor;
+  const fC=macroTargets?macroTargets.c/mpBase.c:fuelFactor;
+  const fF=macroTargets?macroTargets.f/mpBase.f:fuelFactor;
+  const fuelActive=fuelScaled||(macroTargets!=null&&(Math.abs(fP-1)>=0.02||Math.abs(fC-1)>=0.02||Math.abs(fF-1)>=0.02));
+  const scaleSection=(sec)=>fuelActive?{...sec,items:sec.items.map(it=>({...it,
     cal:Math.round(it.cal*fuelFactor/5)*5,
-    p:Math.round(it.p*fuelFactor),
-    c:Math.round(it.c*fuelFactor),
-    f:Math.round(it.f*fuelFactor)}))}:sec;
+    p:Math.round(it.p*fP),
+    c:Math.round(it.c*fC),
+    f:Math.round(it.f*fF)}))}:sec;
   const mp={...mpBase,
     cal:fuelTargetCal,
-    p:fuelScaled?Math.round(mpBase.p*fuelFactor):mpBase.p,
-    c:fuelScaled?Math.round(mpBase.c*fuelFactor):mpBase.c,
-    f:fuelScaled?Math.round(mpBase.f*fuelFactor):mpBase.f,
+    p:macroTargets?macroTargets.p:(fuelScaled?Math.round(mpBase.p*fuelFactor):mpBase.p),
+    c:macroTargets?macroTargets.c:(fuelScaled?Math.round(mpBase.c*fuelFactor):mpBase.c),
+    f:macroTargets?macroTargets.f:(fuelScaled?Math.round(mpBase.f*fuelFactor):mpBase.f),
     bkfst:{...scaleSection(mpBase.bkfst),supps:suppsForMeal(["5:20 AM","6:40 AM","Breakfast"])},
     lunch:{...scaleSection(mpBase.lunch),supps:suppsForMeal(["Lunch","Daily"])},
     dinner:{...scaleSection(mpBase.dinner),supps:suppsForMeal(["Dinner","9:30 PM"])}};
@@ -3530,7 +3550,11 @@ function AppInner({pin, user, onLogout}){
             <div style={{background:C.card,borderRadius:16,padding:"14px 16px",border:`1px solid ${C.yellow}33`,marginBottom:8}}>
               <p style={{margin:"0 0 6px",fontSize:12,color:C.yellow,letterSpacing:"0.1em",fontFamily:FB,fontWeight:600,textTransform:"uppercase"}}>Coach Note</p>
               <p style={{margin:0,fontSize:12,color:C.muted,lineHeight:1.6,fontFamily:FB}}>
-                Current target: {mp.cal.toLocaleString()} kcal · {mp.p}g protein · {mp.c}g carbs. Targets hold steady or rise across phases now rather than cutting further — you're adding muscle, strength, and VO2max work, not just cutting fat. Fix sleep first - 7 hrs unlocks more than any macro change would.
+                {macroTargets?(
+                  <>Current target: {mp.cal.toLocaleString()} kcal · {mp.p}g protein · {mp.c}g carbs. This is a gentle cut — roughly a 285 kcal/day deficit, with protein held at {mp.p}g to protect muscle while the fat comes off. Expect about 0.5 lb/week toward your 8.5% body-fat goal. Judge the trend on 2–3 week averages, not single weigh-ins — and no refeeds are needed at a deficit this size. Fix sleep first - 7 hrs unlocks more than any macro change would.</>
+                ):(
+                  <>Current target: {mp.cal.toLocaleString()} kcal · {mp.p}g protein · {mp.c}g carbs. Targets hold steady or rise across phases now rather than cutting further — you're adding muscle, strength, and VO2max work, not just cutting fat. Fix sleep first - 7 hrs unlocks more than any macro change would.</>
+                )}
               </p>
             </div>
           </div>
